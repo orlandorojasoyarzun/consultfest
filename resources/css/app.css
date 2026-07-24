@@ -6,4 +6,145 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-cinema-dark: #0a0a0a;
+    --color-cinema-gray: #141414;
+    --color-cinema-surface: #1a1a1a;
+    --color-cinema-border: #2a2a2a;
+    --color-cinema-muted: #525252;
+    --color-cinema-text: #fafafa;
+    --color-cinema-text-dim: #a3a3a3;
+    --color-cinema-gold: #d4a853;
+    --color-cinema-gold-dim: #a68942;
+    --color-cinema-red: #dc2626;
+    --color-cinema-green: #16a34a;
+}
+
+:root {
+    --cinema-dark: #0a0a0a;
+    --cinema-gray: #141414;
+    --cinema-surface: #1a1a1a;
+    --cinema-border: #2a2a2a;
+    --cinema-muted: #525252;
+    --cinema-text: #fafafa;
+    --cinema-text-dim: #a3a3a3;
+    --cinema-gold: #d4a853;
+    --cinema-gold-dim: #a68942;
+}
+
+body {
+    background-color: var(--cinema-dark);
+    color: var(--cinema-text);
+    font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+.cinema-card {
+    background-color: var(--cinema-surface);
+    border: 1px solid var(--cinema-border);
+    border-radius: 0.75rem;
+}
+
+.cinema-input {
+    background-color: var(--cinema-gray);
+    border: 1px solid var(--cinema-border);
+    color: var(--cinema-text);
+    border-radius: 0.5rem;
+}
+
+.cinema-input:focus {
+    outline: none;
+    border-color: var(--cinema-gold);
+    box-shadow: 0 0 0 2px rgba(212, 168, 83, 0.2);
+}
+
+.cinema-input::placeholder {
+    color: var(--cinema-muted);
+}
+
+.cinema-btn {
+    background-color: var(--cinema-gold);
+    color: var(--cinema-dark);
+    font-weight: 600;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+}
+
+.cinema-btn:hover {
+    background-color: var(--cinema-gold-dim);
+}
+
+.cinema-btn-outline {
+    background-color: transparent;
+    border: 1px solid var(--cinema-border);
+    color: var(--cinema-text);
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+}
+
+.cinema-btn-outline:hover {
+    border-color: var(--cinema-gold);
+    color: var(--cinema-gold);
+}
+
+.cinema-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.cinema-table th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cinema-text-dim);
+    border-bottom: 1px solid var(--cinema-border);
+}
+
+.cinema-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--cinema-border);
+}
+
+.cinema-table tr:hover td {
+    background-color: rgba(212, 168, 83, 0.05);
+}
+
+.cinema-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 0.25rem;
+}
+
+.cinema-badge-deadline {
+    background-color: rgba(220, 38, 38, 0.15);
+    color: #f87171;
+}
+
+.cinema-badge-opening {
+    background-color: rgba(22, 163, 74, 0.15);
+    color: #4ade80;
+}
+
+.cinema-badge-score {
+    background-color: rgba(212, 168, 83, 0.15);
+    color: var(--cinema-gold);
+}
+
+.cinema-divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--cinema-border), transparent);
+}
+
+.cinema-glow {
+    box-shadow: 0 0 40px rgba(212, 168, 83, 0.1);
+}
+
+::selection {
+    background-color: var(--cinema-gold);
+    color: var(--cinema-dark);
 }
