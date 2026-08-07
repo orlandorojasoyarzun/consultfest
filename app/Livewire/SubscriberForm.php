@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Festival;
 use App\Models\Subscriber;
 use App\Models\Subscription;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class SubscriberForm extends Component
@@ -16,12 +17,18 @@ class SubscriberForm extends Component
     public array $selectedFestivals = [];
     public ?Subscriber $subscriber = null;
     public bool $isRegistered = false;
+    public $subscriptions = null;
 
     protected function rules(): array
     {
         return [
             'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255',
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                Rule::unique('subscribers', 'email')->ignore($this->subscriber?->id),
+            ],
             'phone' => 'nullable|string|max:50',
         ];
     }
@@ -36,6 +43,7 @@ class SubscriberForm extends Component
                 $this->phone = $this->subscriber->phone;
                 $this->notificationsEnabled = $this->subscriber->notifications_enabled;
                 $this->isRegistered = true;
+                $this->loadSubscriptions();
             }
         }
     }
@@ -43,6 +51,8 @@ class SubscriberForm extends Component
     public function register()
     {
         $this->validate();
+
+        $wasNew = $this->subscriber === null;
 
         if ($this->subscriber) {
             $this->subscriber->update([
@@ -62,6 +72,13 @@ class SubscriberForm extends Component
         }
 
         $this->isRegistered = true;
+        $this->loadSubscriptions();
+
+        session()->flash(
+            'subscriber-flash',
+            $wasNew ? '¡Listo! Te has registrado correctamente.' : 'Datos actualizados.'
+        );
+
         $this->dispatch('subscriber-registered', subscriberId: $this->subscriber->id);
     }
 
@@ -74,10 +91,8 @@ class SubscriberForm extends Component
         $festival = Festival::where('api_id', $festivalApiId)->first();
 
         if (!$festival) {
-            $festival = Festival::create([
-                'api_id' => $festivalApiId,
-                'name' => "Festival {$festivalApiId}",
-            ]);
+            $this->addError('selectedFestivals', 'Festival not found. Sync the catalogue first.');
+            return;
         }
 
         Subscription::updateOrCreate(
@@ -91,6 +106,7 @@ class SubscriberForm extends Component
         );
 
         $this->selectedFestivals[] = $festival->id;
+        $this->loadSubscriptions();
     }
 
     public function unsubscribeFromFestival(int $festivalApiId)
@@ -113,13 +129,22 @@ class SubscriberForm extends Component
         }
     }
 
-    public function getSubscriptionsProperty()
+    public function loadSubscriptions()
     {
         if (!$this->subscriber) {
-            return [];
+            $this->subscriptions = collect();
+            return;
         }
 
-        return $this->subscriber->subscriptions()->with('festival')->get();
+        $this->subscriptions = $this->subscriber->subscriptions()->with('festival')->get();
+    }
+
+    public function getSubscriptionsProperty()
+    {
+        if ($this->subscriptions === null) {
+            $this->loadSubscriptions();
+        }
+        return $this->subscriptions;
     }
 
     public function logout()
@@ -131,6 +156,7 @@ class SubscriberForm extends Component
         $this->email = null;
         $this->phone = null;
         $this->selectedFestivals = [];
+        $this->subscriptions = collect();
     }
 
     public function render()

@@ -14,6 +14,13 @@ class Subscription extends Model
         'subscriber_id',
         'festival_id',
         'notification_type',
+    ];
+
+    /**
+     * Fields owned by the system, not the user. They must only be set
+     * by NotificationService (e.g. forceFill), never via mass assignment.
+     */
+    protected $guarded = [
         'notified_opening',
         'notified_deadline',
     ];
