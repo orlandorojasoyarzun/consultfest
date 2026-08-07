@@ -13,6 +13,13 @@ class FestivalCalendar extends Component
     public ?string $category = null;
     public ?string $genre = null;
     public ?string $country = null;
+    /**
+     * Which date column to filter the range against.
+     * Empty string = match either opening_date or deadline (legacy behaviour).
+     * 'opening_date' = filter only by opening date.
+     * 'deadline' = filter only by deadline.
+     */
+    public string $dateField = '';
 
     protected function rules(): array
     {
@@ -22,6 +29,7 @@ class FestivalCalendar extends Component
             'category' => 'nullable|string',
             'genre' => 'nullable|string',
             'country' => 'nullable|string',
+            'dateField' => 'nullable|in:,opening_date,deadline',
         ];
     }
 
@@ -29,6 +37,9 @@ class FestivalCalendar extends Component
     {
         $this->startDate = now()->toDateString();
         $this->endDate = now()->addMonths(3)->toDateString();
+        // No default dateField — leave it null so the results component
+        // falls back to "match either opening_date or deadline in range",
+        // which is the original behaviour users expect.
     }
 
     public function search()
@@ -40,6 +51,7 @@ class FestivalCalendar extends Component
             'category' => $this->category,
             'genre' => $this->genre,
             'country' => $this->country,
+            'dateField' => $this->dateField,
         ])->to(FestivalResults::class);
     }
 
@@ -71,12 +83,27 @@ class FestivalCalendar extends Component
 
     public function clearFilters()
     {
+        // Reset every input to its default first so the UI reflects the
+        // cleared state immediately — the dispatched search below will then
+        // recompute the result list using these defaults.
+        $this->reset([
+            'category',
+            'genre',
+            'country',
+            'dateField',
+        ]);
         $this->startDate = now()->toDateString();
         $this->endDate = now()->addMonths(3)->toDateString();
-        $this->category = null;
-        $this->genre = null;
-        $this->country = null;
-        $this->search();
+        $this->dateField = ''; // legacy: match either opening_date or deadline
+        // Skip validate() — we just set defaults; no user input involved.
+        $this->dispatch('search-festivals', [
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'category' => $this->category,
+            'genre' => $this->genre,
+            'country' => $this->country,
+            'dateField' => $this->dateField,
+        ])->to(FestivalResults::class);
     }
 
     public function render()

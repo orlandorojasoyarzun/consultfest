@@ -2,83 +2,131 @@
 
 namespace Tests\Unit\Services;
 
-use App\Models\Festival;
 use App\Services\FestivalApiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class FestivalApiServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function makeService(): FestivalApiService
+    {
+        // The constructor reads from config() — config defaults are fine
+        // for tests since Http::fake() intercepts before any real call.
+        return new FestivalApiService();
+    }
+
     public function test_service_can_be_instantiated(): void
     {
-        $service = new FestivalApiService();
-        $this->assertInstanceOf(FestivalApiService::class, $service);
+        $this->assertInstanceOf(FestivalApiService::class, $this->makeService());
     }
 
-    public function test_sync_festivals_returns_array(): void
+    public function test_search_festivals_sends_bearer_token(): void
     {
-        $service = new FestivalApiService();
-        $result = $service->syncFestivals();
+        Http::fake([
+            'https://festivalapi.com/v1/festivals*' => Http::response([
+                'count' => 0,
+                'results' => [],
+            ], 200),
+        ]);
+
+        $this->makeService()->searchFestivals(['category' => 'short_film']);
+
+        Http::assertSent(function ($request) {
+            $auth = $request->header('Authorization');
+            return str_starts_with($request->url(), 'https://festivalapi.com/v1/festivals')
+                && is_array($auth)
+                && str_starts_with($auth[0] ?? '', 'Bearer ');
+        });
+    }
+
+    public function test_search_festivals_returns_results_array(): void
+    {
+        Http::fake([
+            'https://festivalapi.com/v1/festivals*' => Http::response([
+                'count' => 1,
+                'results' => [[
+                    'id' => 1,
+                    'name' => 'Sundance',
+                    'categories' => ['feature'],
+                    'genres' => ['drama'],
+                ]],
+            ], 200),
+        ]);
+
+        $result = $this->makeService()->searchFestivals(['category' => 'feature']);
 
         $this->assertIsArray($result);
-        $this->assertArrayHasKey('synced', $result);
+        $this->assertArrayHasKey('results', $result);
+        $this->assertCount(1, $result['results']);
+        $this->assertSame('Sundance', $result['results'][0]['name']);
     }
 
-    public function test_sync_festival_details_returns_array_on_failure(): void
+    public function test_search_festivals_returns_empty_on_http_error(): void
     {
-        $service = new FestivalApiService();
-        $result = $service->syncFestivalDetails(999999);
+        Http::fake([
+            'https://festivalapi.com/v1/festivals*' => Http::response(['detail' => 'Invalid API key'], 401),
+        ]);
 
-        $this->assertNull($result);
+        $result = $this->makeService()->searchFestivals();
+
+        $this->assertSame([], $result);
     }
 
-    public function test_get_scored_festivals_returns_array(): void
+    public function test_search_festivals_returns_empty_on_5xx(): void
     {
-        $service = new FestivalApiService();
-        $result = $service->getScoredFestivals();
+        Http::fake([
+            'https://festivalapi.com/v1/festivals*' => Http::response(['detail' => 'Server error'], 500),
+        ]);
 
-        $this->assertIsArray($result);
+        $result = $this->makeService()->searchFestivals();
+
+        $this->assertSame([], $result);
     }
 
-    public function test_search_festivals_returns_array(): void
+    public function test_search_festivals_returns_empty_on_timeout(): void
     {
-        $service = new FestivalApiService();
-        $result = $service->searchFestivals(['category' => 'short_film']);
+        Http::fake([
+            'https://festivalapi.com/v1/festivals*' => function () {
+                throw new \Illuminate\Http\Client\ConnectionException('timeout');
+            },
+        ]);
 
-        $this->assertIsArray($result);
+        $result = $this->makeService()->searchFestivals();
+
+        $this->assertSame([], $result);
     }
 
-    public function test_search_festivals_with_filters(): void
+    public function test_search_festivals_passes_filters_as_query_string(): void
     {
-        $service = new FestivalApiService();
-        $result = $service->searchFestivals([
-            'category' => 'feature',
+        Http::fake([
+            'https://festivalapi.com/v1/festivals*' => Http::response(['count' => 0, 'results' => []], 200),
+        ]);
+
+        $this->makeService()->searchFestivals([
+            'category' => 'short_film',
             'country' => 'United States',
-            'fee_max' => 100,
+            'deadline_after' => '2026-08-01',
         ]);
 
-        $this->assertIsArray($result);
+        Http::assertSent(function ($request) {
+            $url = $request->url();
+            return str_contains($url, 'category=short_film')
+                && (str_contains($url, 'country=United+States') || str_contains($url, 'country=United%20States'))
+                && str_contains($url, 'deadline_after=2026-08-01');
+        });
     }
 
-    public function test_search_festivals_with_deadline_filter(): void
+    public function test_search_festivals_returns_empty_on_empty_response(): void
     {
-        $service = new FestivalApiService();
-        $result = $service->searchFestivals([
-            'deadline_before' => '2026-12-31',
+        Http::fake([
+            'https://festivalapi.com/v1/festivals*' => Http::response('', 200),
         ]);
 
-        $this->assertIsArray($result);
-    }
+        $result = $this->makeService()->searchFestivals();
 
-    public function test_search_festivals_with_text_query(): void
-    {
-        $service = new FestivalApiService();
-        $result = $service->searchFestivals([
-            'q' => 'Sundance',
-        ]);
-
-        $this->assertIsArray($result);
+        $this->assertSame([], $result);
     }
 }

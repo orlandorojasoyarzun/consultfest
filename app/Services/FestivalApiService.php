@@ -112,20 +112,35 @@ class FestivalApiService
         return [];
     }
 
+    /**
+     * Live search against FestivalAPI.com.
+     *
+     * Used by FestivalSearchService — does NOT persist anything. The auth
+     * header is mandatory: FestivalAPI returns 401 without it.
+     *
+     * Filter keys we accept map 1:1 to FestivalAPI's query params (see
+     * FestivalSearchService::mapFilters for the component→API translation).
+     */
     public function searchFestivals(array $filters = []): array
     {
         try {
             $response = Http::timeout($this->timeout)
                 ->withHeaders([
+                    'Authorization' => 'Bearer ' . $this->apiKey,
                     'Accept' => 'application/json',
                 ])
                 ->get("{$this->baseUrl}/festivals", $filters);
 
             if ($response->successful()) {
-                return $response->json();
+                return $response->json() ?? [];
             }
+
+            Log::warning('FestivalAPI search non-2xx', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
         } catch (\Exception $e) {
-            Log::error('FestivalAPI search failed', ['error' => $e->getMessage()]);
+            Log::error('FestivalAPI search exception', ['error' => $e->getMessage()]);
         }
 
         return [];
