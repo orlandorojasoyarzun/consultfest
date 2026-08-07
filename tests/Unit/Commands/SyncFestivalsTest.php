@@ -6,6 +6,7 @@ use App\Console\Commands\SyncFestivals;
 use App\Services\FestivalApiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use Illuminate\Support\Facades\Http;
 
 class SyncFestivalsTest extends TestCase
 {
@@ -30,12 +31,26 @@ class SyncFestivalsTest extends TestCase
 
     public function test_sync_festivals_command_can_be_executed(): void
     {
+        Http::fake([
+            'https://festivalapi.com/v1/festivals*' => Http::response([
+                'results' => [],
+                'total_pages' => 1,
+            ], 200),
+        ]);
+
         $this->artisan('festivals:sync')
             ->assertSuccessful();
     }
 
     public function test_sync_festivals_command_with_details_option(): void
     {
+        Http::fake([
+            'https://festivalapi.com/v1/festivals*' => Http::response([
+                'results' => [],
+                'total_pages' => 1,
+            ], 200),
+        ]);
+        
         $this->artisan('festivals:sync', ['--details' => true])
             ->assertSuccessful();
     }
