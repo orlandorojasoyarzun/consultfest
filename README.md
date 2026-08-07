@@ -1,58 +1,199 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Consultfest
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**Film Festival Distribution CRM** - Una herramienta para cineastas que buscan festivales de cine y quieren recibir notificaciones antes de los deadlines.
 
-## About Laravel
+## Qué es
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Consultfest permite:
+- **Buscar festivales** por rango de fechas, categoría, género y país
+- **Registrarse** con nombre, email y teléfono para recibir notificaciones
+- **Suscribirse** a festivales específicos
+- **Recibir emails recordatorio** cuando un festival está por cerrar o abrir
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Arquitectura
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Stack Tecnológico
 
-## Learning Laravel
+| Componente | Decisión | Justificación |
+|------------|----------|---------------|
+| **Framework** | Laravel 13 | Robustez, ecosistema maduro, Eloquent ORM |
+| **Frontend** | Livewire 4 | Componentes reactivos sin boilerplate JS |
+| **CSS** | Tailwind CSS v4 | Diseño rápido con variables CSS personalizadas |
+| **Base de datos dev** | SQLite | Zero-config, ideal para desarrollo local |
+| **Email** | Resend | API simple, integración directa con Laravel |
+| **Búsqueda API** | FestivalAPI | API pública de festivales de cine |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Decisiones de Diseño
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+**1. Sin autenticación de usuario**
+- Es una herramienta pública de búsqueda
+- El usuario se registra solo para recibir notificaciones
+- La sesión se maneja via `session()` de Laravel (cookie)
+- No hay passwords, no hay login complejo
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+**2. Modelo de datos simplificado**
+```
+Subscriber (id, name, email, phone, notifications_enabled)
+    └── Subscription (subscriber_id, festival_id, notification_type)
+            └── Festival (id, api_id, name, category, country, deadline, ...)
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+**3. Festivales desde API externa**
+- Los festivales se sincronizan desde FestivalAPI
+- Se guardan en la base de datos local
+- El `FestivalApiService` maneja la comunicación con la API
+- `SyncFestivals` command sincroniza periódicamente
 
-## Contributing
+**4. Notificaciones basadas en suscripciones**
+- El usuario suscribe a festivales específicos
+- Un command (`festivals:check-deadlines`) corre diariamente
+- Envía emails 7 y 30 días antes del deadline/apertura
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Estructura del Proyecto
 
-## Code of Conduct
+```
+app/
+├── Console/Commands/
+│   ├── SyncFestivals.php          # Sincroniza festivales desde API
+│   └── CheckFestivalDeadlines.php # Verifica y envía notificaciones
+├── Http/Controllers/
+│   └── FestivalController.php      # Rutas API y web
+├── Livewire/
+│   ├── FestivalCalendar.php       # Filtros de búsqueda
+│   ├── FestivalResults.php        # Lista de resultados
+│   └── SubscriberForm.php         # Formulario de registro
+├── Models/
+│   ├── Festival.php               # Festival de cine
+│   ├── Subscriber.php            # Usuario registrado
+│   └── Subscription.php           # Relación subscriber-festival
+├── Notifications/
+│   ├── FestivalDeadlineNotification.php
+│   └── FestivalOpeningNotification.php
+└── Services/
+    ├── FestivalApiService.php     # Cliente de API externa
+    └── NotificationService.php     # Lógica de notificaciones
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+database/
+├── migrations/
+│   ├── ...create_festivals_table.php
+│   ├── ...create_subscribers_table.php
+│   └── ...create_subscriptions_table.php
+├── factories/
+│   ├── FestivalFactory.php
+│   ├── SubscriberFactory.php
+│   └── SubscriptionFactory.php
+└── seeders/
+    └── FestivalSeeder.php          # 30 festivales de prueba
 
-## Security Vulnerabilities
+resources/views/
+├── welcome.blade.php             # Página principal (2 columnas)
+├── festivals/
+│   ├── index.blade.php           # Lista paginada
+│   └── show.blade.php            # Detalle de festival
+└── livewire/
+    ├── festival-calendar.blade.php
+    ├── festival-results.blade.php
+    └── subscriber-form.blade.php
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Setup Local
 
-## License
+```bash
+# Instalar dependencias
+composer install
+npm install
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Copiar entorno
+cp .env.example .env
+
+# Generar key
+php artisan key:generate
+
+# Migrar y seedear
+php artisan migrate:fresh --seed
+
+# Construir assets
+npm run build
+
+# Iniciar servidor
+php artisan serve
+```
+
+## Comandos Disponibles
+
+```bash
+# Sincronizar festivales desde API
+php artisan festivals:sync
+
+# Verificar deadlines y enviar notificaciones
+php artisan festivals:check-deadlines
+
+# Verificar un día específico
+php artisan festivals:check-deadlines --days=7
+```
+
+## Scheduler (notificaciones automáticas)
+
+Los comandos `festivals:sync` (06:00) y `festivals:check-deadlines` (08:00) corren
+vía Laravel scheduler. Para que se ejecuten automáticamente hay que registrar un
+LaunchAgent de macOS:
+
+```bash
+cp scripts/com.consultfest.scheduler.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.consultfest.scheduler.plist
+```
+
+Verificar que está corriendo:
+
+```bash
+launchctl list | grep consultfest
+tail -f storage/logs/scheduler.log
+```
+
+Para detenerlo:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.consultfest.scheduler.plist
+```
+
+En Linux usar `crontab -e` con la entrada:
+
+```
+* * * * * cd /path/to/consultfest && php artisan schedule:run >> /dev/null 2>&1
+```
+
+## API Endpoints
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/` | Página principal |
+| GET | `/festivals` | Lista paginada de festivales |
+| GET | `/festivals/{id}` | Detalle de festival |
+| GET | `/festivals/search` | Búsqueda con filtros (JSON) |
+| POST | `/subscribe` | Suscribirse a un festival |
+| DELETE | `/unsubscribe/{api_id}` | Desuscribirse |
+
+## Tests
+
+```bash
+php artisan test
+# 58 tests, 74 assertions
+```
+
+## Decisiones Pendientes
+
+- [ ] Integración real con FestivalAPI (API key no disponible aún)
+- [ ] Configurar scheduler de Laravel para notifications automáticas
+- [ ] Dashboard de estadísticas para el usuario registrado
+- [ ] Historial de notificaciones enviadas
+
+## Conceptos Clave
+
+**Subscriber**: Cineasta registrado que quiere recibir notificaciones
+**Subscription**: Relación entre un subscriber y un festival específico
+**NotificationType**: `opening` | `deadline` | `both`
+**Festival Score**: Puntuación del festival (de la API externa)
+
+---
+
+*Última actualización: Julio 2026*
