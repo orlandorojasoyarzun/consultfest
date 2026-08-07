@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS LaunchAgent that runs Consultfest's Laravel scheduler every minute.
+
+  Install:
+    cp scripts/com.consultfest.scheduler.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.consultfest.scheduler.plist
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.consultfest.scheduler.plist
+    rm ~/Library/LaunchAgents/com.consultfest.scheduler.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.consultfest.scheduler</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/orlandorojas/salem.dev/consultfest/scripts/run-scheduler.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/orlandorojas/salem.dev/consultfest</string>
+
+    <key>StartInterval</key>
+    <integer>60</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/orlandorojas/salem.dev/consultfest/storage/logs/scheduler.stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/orlandorojas/salem.dev/consultfest/storage/logs/scheduler.stderr.log</string>
+</dict>
+</plist>
