@@ -38,7 +38,11 @@ class NotificationService
 
                 try {
                     $subscriber->notify(new FestivalDeadlineNotification($festival, $daysAhead));
-                    $subscription->update(['notified_deadline' => true]);
+                    // Direct attribute write: notified_* is in $guarded on Subscription,
+                    // so update([...]) would be silently rejected. The system is the
+                    // only legitimate writer of these flags.
+                    $subscription->notified_deadline = true;
+                    $subscription->save();
                     $notified->push([
                         'subscriber_id' => $subscriber->id,
                         'festival_id' => $festival->id,
@@ -83,7 +87,9 @@ class NotificationService
 
                 try {
                     $subscriber->notify(new FestivalOpeningNotification($festival, $daysAhead));
-                    $subscription->update(['notified_opening' => true]);
+                    // See note in checkAndNotifyDeadline: notified_* is $guarded.
+                    $subscription->notified_opening = true;
+                    $subscription->save();
                     $notified->push([
                         'subscriber_id' => $subscriber->id,
                         'festival_id' => $festival->id,
