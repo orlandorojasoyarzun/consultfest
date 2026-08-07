@@ -24,6 +24,14 @@ class Festival extends Model
         'last_synced_at',
     ];
 
+    /**
+     * Hide the raw API payload from serialization. It can contain
+     * descriptions, URLs and other fields that should not leak to clients.
+     */
+    protected $hidden = [
+        'details',
+    ];
+
     protected function casts(): array
     {
         return [

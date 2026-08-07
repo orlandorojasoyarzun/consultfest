@@ -10,6 +10,14 @@ use Illuminate\Http\JsonResponse;
 
 class FestivalController extends Controller
 {
+    /**
+     * Browse page. Data is fetched live by the embedded <livewire:festival-results>
+     * component via FestivalSearchService — see plan: Estrategia A (no local DB).
+     */
+    public function index(Request $request)
+    {
+        return view('festivals.index');
+    }
     public function search(Request $request): JsonResponse
     {
         $request->validate([
@@ -32,7 +40,9 @@ class FestivalController extends Controller
         }
 
         if ($request->genre) {
-            $query->where('details->genres', 'LIKE', '%' . $request->genre . '%');
+            // Escape LIKE wildcards so the user cannot expand the match set.
+            $genre = addcslashes((string) $request->genre, '%_\\');
+            $query->where('details->genres', 'LIKE', '%' . $genre . '%');
         }
 
         if ($request->country) {
@@ -46,34 +56,6 @@ class FestivalController extends Controller
             'count' => $festivals->count(),
             'filters' => $request->only(['start_date', 'end_date', 'category', 'genre', 'country']),
         ]);
-    }
-
-    public function index(Request $request)
-    {
-        $query = Festival::query();
-
-        if ($request->has('start_date') && $request->has('end_date')) {
-            $query->where(function ($q) use ($request) {
-                $q->whereBetween('deadline', [$request->start_date, $request->end_date])
-                  ->orWhereBetween('opening_date', [$request->start_date, $request->end_date]);
-            });
-        }
-
-        if ($request->has('category')) {
-            $query->where('category', $request->category);
-        }
-
-        if ($request->has('genre')) {
-            $query->where('details->genres', 'LIKE', '%' . $request->input('genre') . '%');
-        }
-
-        if ($request->has('country')) {
-            $query->where('country', $request->country);
-        }
-
-        $festivals = $query->orderBy('deadline')->paginate(20);
-
-        return view('festivals.index', compact('festivals'));
     }
 
     public function show(Festival $festival)
@@ -109,10 +91,9 @@ class FestivalController extends Controller
         $festival = Festival::where('api_id', $request->festival_api_id)->first();
 
         if (!$festival) {
-            $festival = Festival::create([
-                'api_id' => $request->festival_api_id,
-                'name' => "Festival {$request->festival_api_id}",
-            ]);
+            return response()->json([
+                'error' => 'Festival not found. Sync the catalogue first.',
+            ], 404);
         }
 
         Subscription::updateOrCreate(
