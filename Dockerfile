@@ -108,7 +108,10 @@ RUN composer install --no-interaction --optimize-autoloader --prefer-dist
 RUN npm install -g pnpm@9
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# The repo has `.npmrc` with `ignore-scripts=true` (used in dev to skip
+# postinstall noise). In Docker we need postinstall scripts to run so
+# Vite + laravel-vite-plugin can register properly. Override per-command.
+RUN pnpm install --frozen-lockfile --config.ignore-scripts=false
 
 # Finally the rest of the app code.
 COPY . .
