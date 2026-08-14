@@ -47,10 +47,22 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 # Install PHP deps in their own layer so editing app code doesn't bust the cache.
-# We copy composer.json + lockfile + artisan + bootstrap together because composer's
-# post-install script runs `php artisan package:discover`, which needs artisan and
-# bootstrap/app.php to exist already.
-COPY composer.json composer.lock artisan bootstrap ./
+# We split the COPYs (instead of one combined COPY) because Debug-Time: BuildKit
+# and Railway's builder were silently producing an empty bootstrap/ directory with
+# the combined form. Separating each source makes the COPY deterministic and lets
+# us `ls` each one to verify what's actually in the image.
+#
+# Composer's post-install script runs `php artisan package:discover`, which needs
+# artisan and bootstrap/app.php to exist already — so we copy them before
+# composer install.
+COPY composer.json composer.lock ./
+COPY artisan ./
+COPY bootstrap ./bootstrap
+
+# Debug: confirm what's actually in the image before composer runs.
+# If bootstrap/app.php is missing here, the build log will show it and we'll
+# know whether the COPY is the problem or something else.
+RUN ls -la /app/ && echo "---BOOTSTRAP---" && ls -la /app/bootstrap/
 
 RUN composer install --no-interaction --optimize-autoloader --prefer-dist
 
