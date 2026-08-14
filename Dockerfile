@@ -16,7 +16,11 @@ FROM php:8.4-cli-bookworm
 #   curl, zip, unzip → utility tools (composer install, archive handling)
 #   libpng/libonig/libxml/libzip-dev → headers for gd/mbstring/zip
 #   libpq-dev       → headers + client library for pdo_pgsql (libpq-fe.h, libpq.so)
-#   nodejs + npm    → frontend build (Tailwind v4 via Vite)
+#   ca-certificates, gnupg → needed to add NodeSource repo for Node 20+
+#
+# We install Node 20+ from NodeSource because Debian Bookworm ships Node 18,
+# and rolldown (Vite's bundler in v4+) requires Node 20+'s `node:util` API
+# (`styleText` export). Node 18 makes `pnpm run build` fail at import time.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
@@ -28,8 +32,15 @@ RUN apt-get update \
         libxml2-dev \
         libzip-dev \
         libpq-dev \
-        nodejs \
-        npm \
+        ca-certificates \
+        gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x bookworm main" \
+        > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions Laravel + Postgres need:
