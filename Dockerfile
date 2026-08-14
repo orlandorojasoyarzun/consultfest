@@ -116,6 +116,11 @@ RUN pnpm install --frozen-lockfile --config.ignore-scripts=false
 # Finally the rest of the app code.
 COPY . .
 
+# Railway init script needs to be executable — `COPY` doesn't preserve the
+# +x bit, so we set it explicitly. The script runs migrations and warms
+# caches before the server starts (see CMD below).
+RUN chmod +x ./railway/init-app.sh
+
 # Build frontend assets (Tailwind v4 / Vite → public/build).
 RUN pnpm run build \
     && ls -la /app/public/build/ \
@@ -124,17 +129,13 @@ RUN pnpm run build \
 # Railway sets $PORT dynamically. Default to 8000 for parity with artisan serve.
 EXPOSE 8000
 
-# On every container start: migrate, warm caches, serve.
-# migrate --force is required because the env is non-interactive.
-# config:cache / route:cache / view:cache always rebuild — env vars may have changed.
+# On every container start: run init-app.sh (migrate + warm caches), then serve.
+# We invoke the script via `sh -c` so the chained `serve` runs in the same
+# process — splitting them across CMD + ENTRYPOINT breaks the && chain.
 #
 # Why hardcode 8000 instead of $PORT: Railway's $PORT is set to 8080 by
 # default but Railway's port forward (Settings → Networking) maps the
 # public domain to 8000. Listening on 8080 means the request hits the
 # proxy but the app's port doesn't accept — "Application failed to
 # respond". Hardcoding 8000 aligns with Railway's default mapping.
-CMD php artisan migrate --force \
-    && php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan view:cache \
-    && php artisan serve --host=0.0.0.0 --port=8000
+CMD ["sh", "-c", "sh ./railway/init-app.sh && php artisan serve --host=0.0.0.0 --port=8000"]
