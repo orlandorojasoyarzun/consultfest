@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Services\FestivalApiService;
 use App\Services\FestivalRateLimitException;
 use App\Services\FestivalSearchService;
 use Illuminate\Support\Collection;
@@ -37,16 +38,25 @@ class FestivalResults extends Component
      */
     public bool $isRateLimited = false;
 
+    /**
+     * True when FestivalAPI is not configured on this deploy (no
+     * FESTIVAL_API_KEY env var). We surface a friendly message instead of
+     * letting the user stare at an empty list wondering if the search broke.
+     */
+    public bool $isApiNotConfigured = false;
+
     protected $listeners = [
         'search-festivals' => 'search',
     ];
 
-    public function boot(FestivalSearchService $search): void
+    public function boot(FestivalSearchService $search, FestivalApiService $api): void
     {
         $this->searchService = $search;
+        $this->apiService = $api;
     }
 
     private FestivalSearchService $searchService;
+    private FestivalApiService $apiService;
 
     public function mount()
     {
@@ -60,6 +70,7 @@ class FestivalResults extends Component
     {
         $this->isLoading = true;
         $this->isRateLimited = false;
+        $this->isApiNotConfigured = false;
 
         // Persist the last filters so paginate() can re-apply them when the
         // user clicks "next".
@@ -87,6 +98,24 @@ class FestivalResults extends Component
 
     public function render()
     {
+        // If FestivalAPI isn't wired up on this deploy, skip the search
+        // round-trip entirely and surface a friendly message. Without this
+        // guard the empty result list would be indistinguishable from a
+        // broken search.
+        if (!$this->apiService->isConfigured()) {
+            $this->isApiNotConfigured = true;
+            $results = collect();
+            $totalPages = 1;
+            $items = collect();
+            $this->page = 1;
+            return view('livewire.festival-results', [
+                'totalCount' => 0,
+                'festivals' => $items,
+                'currentPage' => 1,
+                'totalPages' => $totalPages,
+            ]);
+        }
+
         // Run the search. We catch the rate-limit exception so the UI
         // degrades to a friendly message instead of a 500.
         try {

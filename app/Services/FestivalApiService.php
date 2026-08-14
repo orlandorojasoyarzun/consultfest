@@ -9,19 +9,42 @@ use Carbon\Carbon;
 
 class FestivalApiService
 {
-    private string $apiKey;
+    /**
+     * Nullable because the deploy may not have FESTIVAL_API_KEY wired up
+     * (e.g. local dev, demo deploy). When null, every method that talks to
+     * the API short-circuits — search returns empty, sync returns 0 rows —
+     * and the UI degrades to the "API not configured" message instead of
+     * crashing with TypeError on construction.
+     */
+    private ?string $apiKey;
     private string $baseUrl;
     private int $timeout;
 
     public function __construct()
     {
+        // config() can return null when the env var is missing; PHP < 8.1
+        // would silently cast null to '' for typed properties (lying), but
+        // 8.4 (our runtime) throws TypeError. Make the optionality explicit.
         $this->apiKey = config('festivalapi.api_key');
-        $this->baseUrl = config('festivalapi.base_url');
-        $this->timeout = config('festivalapi.timeout', 30);
+        $this->baseUrl = config('festivalapi.base_url', 'https://festivalapi.com/v1');
+        $this->timeout = (int) config('festivalapi.timeout', 30);
+    }
+
+    /**
+     * Whether the API key is wired up. Callers (FestivalSearchService) use
+     * this to skip the HTTP round-trip and surface a friendly UI state.
+     */
+    public function isConfigured(): bool
+    {
+        return is_string($this->apiKey) && $this->apiKey !== '';
     }
 
     public function syncFestivals(int $perPage = 100): array
     {
+        if (!$this->isConfigured()) {
+            return ['synced' => 0, 'reason' => 'FESTIVAL_API_KEY not set'];
+        }
+
         $synced = 0;
         $page = 1;
 
@@ -88,6 +111,10 @@ class FestivalApiService
      */
     public function getFestivalDetails(int $apiId): ?array
     {
+        if (!$this->isConfigured()) {
+            return null;
+        }
+
         try {
             $response = Http::timeout($this->timeout)
                 ->withHeaders([
@@ -116,6 +143,10 @@ class FestivalApiService
 
     public function getScoredFestivals(int $perPage = 20): array
     {
+        if (!$this->isConfigured()) {
+            return [];
+        }
+
         try {
             $response = Http::timeout($this->timeout)
                 ->withHeaders([
@@ -147,6 +178,10 @@ class FestivalApiService
      */
     public function searchFestivals(array $filters = []): array
     {
+        if (!$this->isConfigured()) {
+            return [];
+        }
+
         try {
             $response = Http::timeout($this->timeout)
                 ->withHeaders([
