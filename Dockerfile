@@ -46,6 +46,10 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
+# Build-ID marker. If you see this in the build log, Railway is reading THIS Dockerfile.
+# If you don't see it, Railway is building from a cached/stale Dockerfile.
+RUN echo "BUILD-MARKER: e9e025c-explicit-copy-$(date +%s)"
+
 # Install PHP deps in their own layer so editing app code doesn't bust the cache.
 # We split the COPYs (instead of one combined COPY) because Debug-Time: BuildKit
 # and Railway's builder were silently producing an empty bootstrap/ directory with
@@ -59,6 +63,10 @@ COPY composer.json composer.lock ./
 COPY artisan ./
 COPY bootstrap/app.php ./bootstrap/app.php
 COPY bootstrap/providers.php ./bootstrap/providers.php
+# bootstrap/cache/ is required by Laravel at runtime (package:discover writes
+# services.php and packages.php into it). The dir is empty in git (only its
+# inner .gitignore is tracked), so we create it here.
+RUN mkdir -p /app/bootstrap/cache && chmod 775 /app/bootstrap/cache
 
 # Debug: confirm what's actually in the image before composer runs.
 RUN ls -la /app/ && echo "---BOOTSTRAP---" && ls -la /app/bootstrap/
