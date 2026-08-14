@@ -1,0 +1,73 @@
+# Railway build for Consultfest.
+#
+# Why a Dockerfile instead of Nixpacks: Nixpacks' Laravel preset merges its
+# own PHP (8.3) into PATH even when we override [phases.setup] with php84,
+# so composer install keeps failing with "your php version (8.3.33) does not
+# satisfy that requirement". A Dockerfile is explicit — the PHP version you
+# see in the FROM line is the PHP version composer runs against.
+#
+# PHP 8.4-cli-bookworm matches the local dev environment (PHP 8.4.23 via
+# Laravel Herd) and satisfies composer.lock's symfony/* v8.1 requirements.
+
+FROM php:8.4-cli-bookworm
+
+# System deps. Most are required by PHP extensions we install below.
+#   git             → composer needs it for some package metadata
+#   curl, zip, unzip → utility tools (composer install, archive handling)
+#   libpng/libonig/libxml/libzip-dev → headers for gd/mbstring/zip
+#   nodejs + npm    → frontend build (Tailwind v4 via Vite)
+#   postgresql-client → pg_isready for health checks (optional)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git \
+        curl \
+        zip \
+        unzip \
+        libpng-dev \
+        libonig-dev \
+        libxml2-dev \
+        libzip-dev \
+        nodejs \
+        npm \
+        postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# PHP extensions Laravel + Postgres need:
+#   pdo_pgsql — Postgres driver (we run Postgres in production)
+#   mbstring  — string handling (Laravel core)
+#   bcmath    — arbitrary precision math
+#   gd        — image handling (avatars, attachments)
+#   zip       — ZipArchive (used by some packages)
+#   intl      — locale-aware sorting (Laravel uses it in some comparisons)
+RUN docker-php-ext-install pdo pdo_pgsql mbstring bcmath gd zip intl
+
+# Composer (official image is the standard way to install the latest).
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
+
+# Install PHP deps in their own layer so editing app code doesn't bust the cache.
+COPY composer.json composer.lock ./
+RUN composer install --no-interaction --optimize-autoloader --prefer-dist
+
+# Then npm deps.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Finally the rest of the app code.
+COPY . .
+
+# Build frontend assets (Tailwind v4 / Vite → public/build).
+RUN npm run build
+
+# Railway sets $PORT dynamically. Default to 8000 for parity with artisan serve.
+EXPOSE 8000
+
+# On every container start: migrate, warm caches, serve.
+# migrate --force is required because the env is non-interactive.
+# config:cache / route:cache / view:cache always rebuild — env vars may have changed.
+CMD php artisan migrate --force \
+    && php artisan config:cache \
+    && php artisan route:cache \
+    && php artisan view:cache \
+    && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}

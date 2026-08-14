@@ -1,0 +1,32 @@
+# Stuff we don't want to copy into the Docker image.
+# Keeps the image small and rebuilds fast.
+
+# VCS + CI
+.git
+.github
+.gitignore
+
+# Env (Railway injects its own)
+.env
+.env.example
+
+# Re-installed inside the image
+vendor
+node_modules
+public/build
+
+# IDE / OS noise
+.vscode
+.idea
+.DS_Store
+
+# Tests don't belong in production images
+tests
+
+# Docs are for humans, not containers
+*.md
+docs
+
+# Docker self-references
+Dockerfile
+.dockerignore
