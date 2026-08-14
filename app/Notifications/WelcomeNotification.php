@@ -3,8 +3,6 @@
 namespace App\Notifications;
 
 use App\Models\Subscriber;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -14,10 +12,15 @@ use Illuminate\Notifications\Notification;
  * Goal: confirm the registration landed, give the user a direct link
  * to their dashboard, and outline what they can do next. Kept short on
  * purpose — this is the first impression, not a feature tour.
+ *
+ * Synchronous on purpose: this deploy runs no queue worker, so a queued
+ * notification would land in the `jobs` table and never get sent. For a
+ * demo of 1–2 users the sync path is fine — it adds ~1–2s to the
+ * registration request (SMTP round-trip to Gmail/Resend). When traffic
+ * warrants it, swap in a worker service and re-add `implements ShouldQueue`.
  */
-class WelcomeNotification extends Notification implements ShouldQueue
+class WelcomeNotification extends Notification
 {
-    use Queueable;
 
     public function __construct(
         public Subscriber $subscriber,
