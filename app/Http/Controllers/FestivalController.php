@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Data\FestivalData;
 use App\Models\Festival;
 use App\Models\Subscriber;
 use App\Models\Subscription;
+use App\Notifications\FestivalSubscribedNotification;
+use App\Notifications\FestivalUnsubscribedNotification;
+use App\Services\FestivalSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -75,6 +79,66 @@ class FestivalController extends Controller
         ]);
     }
 
+    /**
+     * Lazy redirect used by the festival list page. When the user clicks a
+     * card we run FestivalSearchService::details() (1 FestivalAPI credit,
+     * 24h cache per apiId) and 302 to the organizer's real URL. Browsing
+     * the list itself never enriches — only signals of intent (clicking)
+     * cost credits, and the cache means the same festival costs nothing
+     * for the rest of the day.
+     *
+     * The list-endpoint row has whatever name/URL the API gave us. We
+     * build a stub DTO from the cached Festival row when present, else
+     * fall back to a stub with just apiId+name so details() can still
+     * reach the API and bestUrl() has something to render.
+     */
+    public function redirectToFestival(int $apiId, FestivalSearchService $search): \Illuminate\Http\RedirectResponse
+    {
+        // If we have a local Festival row (from dev seeder / sync), use it
+        // as the stub so the DTO already has whatever URLs the list gave us
+        // — saves us a second API call if bestUrl() already works.
+        $local = Festival::where('api_id', $apiId)->first();
+        $stub = $local
+            ? new FestivalData(
+                apiId: $local->api_id ?? $apiId,
+                name: $local->name ?? '',
+                categories: [],
+                primaryCategory: null,
+                country: $local->country,
+                city: null,
+                state: null,
+                genres: [],
+                deadline: null,
+                eventStartDate: null,
+                regularFee: null,
+                submissionUrl: null,
+                website: null,
+                compositeScore: null,
+            )
+            : new FestivalData(
+                apiId: $apiId,
+                name: '',
+                categories: [],
+                primaryCategory: null,
+                country: null,
+                city: null,
+                state: null,
+                genres: [],
+                deadline: null,
+                eventStartDate: null,
+                regularFee: null,
+                submissionUrl: null,
+                website: null,
+                compositeScore: null,
+            );
+
+        $enriched = $search->details($stub);
+
+        $url = $enriched->bestUrl() ?? 'https://filmfreeway.com/';
+
+        return redirect()->away($url);
+    }
+
     public function subscribe(Request $request): JsonResponse
     {
         $request->validate([
@@ -106,6 +170,16 @@ class FestivalController extends Controller
             ]
         );
 
+        // Confirmation email — queued. Tells the user the subscription was
+        // recorded and reminds them which notification type they chose.
+        $subscriber = Subscriber::find($subscriberId);
+        if ($subscriber) {
+            $subscriber->notify(new FestivalSubscribedNotification(
+                $festival,
+                $request->notification_type,
+            ));
+        }
+
         return response()->json(['success' => true]);
     }
 
@@ -120,9 +194,19 @@ class FestivalController extends Controller
         $festival = Festival::where('api_id', $festivalApiId)->first();
 
         if ($festival) {
-            Subscription::where('subscriber_id', $subscriberId)
+            // Only send confirmation email if there WAS a subscription to
+            // remove. Idempotent endpoint shouldn't spam users when they
+            // hit unsubscribe for a festival they never subscribed to.
+            $deleted = Subscription::where('subscriber_id', $subscriberId)
                 ->where('festival_id', $festival->id)
                 ->delete();
+
+            if ($deleted > 0) {
+                $subscriber = Subscriber::find($subscriberId);
+                if ($subscriber) {
+                    $subscriber->notify(new FestivalUnsubscribedNotification($festival));
+                }
+            }
         }
 
         return response()->json(['success' => true]);

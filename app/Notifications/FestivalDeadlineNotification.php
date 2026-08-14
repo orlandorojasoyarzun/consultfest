@@ -27,14 +27,14 @@ class FestivalDeadlineNotification extends Notification implements ShouldQueue
         $deadline = $this->festival->deadline->format('M d, Y');
 
         return (new MailMessage)
-            ->subject("⏰ Festival Deadline in {$this->daysAhead} days: {$this->festival->name}")
-            ->greeting("Hello {$notifiable->name},")
-            ->line("**{$this->festival->name}** has a submission deadline in **{$this->daysAhead} days** ({$deadline}).")
-            ->line("**Category:** {$this->festival->category}")
-            ->line("**Country:** {$this->festival->country}")
-            ->line("**Submission Fee:** $" . number_format($this->festival->submission_fee, 2))
-            ->action('View Festival Details', url('/festivals/' . $this->festival->id))
-            ->line('Log in to Consultfest to manage your submission status.');
+            ->subject("Deadline del festival en {$this->daysAhead} días: {$this->festival->name}")
+            ->greeting("Hola {$notifiable->name},")
+            ->line("**{$this->festival->name}** tiene deadline en **{$this->daysAhead} días** ({$deadline}).")
+            ->line("**Categoría:** {$this->festival->category}")
+            ->line("**País:** {$this->festival->country}")
+            ->line("**Tasa de admisión:** $" . number_format($this->festival->submission_fee, 2))
+            ->action('Ver los detalles del festival', url('/festivals/' . $this->festival->id))
+            ->line('Inicia sesión en Consultfest para manejar el estado de tus subcripciones.');
     }
 
     public function toArray(object $notifiable): array
