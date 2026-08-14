@@ -1,0 +1,10 @@
+# Railway build configuration — overrides the default PHP version.
+# Default Railway PHP is 8.3, but composer.lock requires PHP 8.4+ (symfony/clock v8.1.0).
+# We don't downgrade the dep — we upgrade the runtime. composer.json still says ^8.3,
+# so local dev on 8.3 continues to work; this only affects the build target.
+#
+# Other phases (composer install, npm ci, npm run build, php artisan serve) are
+# inherited from Railway's Laravel preset.
+
+[phases.setup]
+nixPkgs = ["php84", "php84Packages.composer", "nodejs_20"]
