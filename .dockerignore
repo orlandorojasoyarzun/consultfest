@@ -13,7 +13,9 @@
 # Re-installed inside the image
 vendor
 node_modules
-public/build
+# NOTE: public/build is NOT ignored — Vite generates it during the image
+# build (RUN pnpm run build) and we need it in the final image so Laravel
+# can serve the compiled CSS/JS.
 
 # IDE / OS noise
 .vscode

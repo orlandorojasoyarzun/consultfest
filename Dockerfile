@@ -114,7 +114,9 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Build frontend assets (Tailwind v4 / Vite → public/build).
-RUN pnpm run build
+RUN pnpm run build \
+    && ls -la /app/public/build/ \
+    && ls -la /app/public/build/assets/ 2>/dev/null | head -20
 
 # Railway sets $PORT dynamically. Default to 8000 for parity with artisan serve.
 EXPOSE 8000
