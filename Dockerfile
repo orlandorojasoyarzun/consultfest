@@ -122,8 +122,14 @@ EXPOSE 8000
 # On every container start: migrate, warm caches, serve.
 # migrate --force is required because the env is non-interactive.
 # config:cache / route:cache / view:cache always rebuild — env vars may have changed.
+#
+# Why hardcode 8000 instead of $PORT: Railway's $PORT is set to 8080 by
+# default but Railway's port forward (Settings → Networking) maps the
+# public domain to 8000. Listening on 8080 means the request hits the
+# proxy but the app's port doesn't accept — "Application failed to
+# respond". Hardcoding 8000 aligns with Railway's default mapping.
 CMD php artisan migrate --force \
     && php artisan config:cache \
     && php artisan route:cache \
     && php artisan view:cache \
-    && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+    && php artisan serve --host=0.0.0.0 --port=8000
