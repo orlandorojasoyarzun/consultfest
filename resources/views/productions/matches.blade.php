@@ -55,7 +55,7 @@
                 Festivales sugeridos para <span class="font-display italic text-[var(--accent)]">{{ $production->title }}</span>
             </h1>
             <p class="text-sm text-[var(--text-muted)]">
-                {{ $festivals->count() }} {{ $festivals->count() === 1 ? 'festival matchea' : 'festivales matchean' }} con tu producción.
+                {{ $totalMatches }} {{ $totalMatches === 1 ? 'festival matchea' : 'festivales matchean' }} con tu producción.
                 Solo recibirás notificaciones de los que te suscribas.
             </p>
         </div>
@@ -85,56 +85,90 @@
                                     @if($festival->country)
                                         <span>{{ $festival->country }}</span>
                                     @endif
-                                    @if($festival->category)
+                                    @if($festival->primaryCategory)
                                         <span class="text-[var(--text-faintest)]">·</span>
-                                        <span>{{ ucfirst(str_replace('_', ' ', $festival->category)) }}</span>
+                                        <span>{{ ucfirst(str_replace('_', ' ', $festival->primaryCategory)) }}</span>
                                     @endif
-                                    @if($festival->festival_score)
+                                    @if($festival->compositeScore !== null)
                                         <span class="text-[var(--text-faintest)]">·</span>
-                                        <span class="tabular-nums">Score {{ $festival->festival_score }}</span>
+                                        <span class="tabular-nums">Score {{ $festival->compositeScore }}</span>
                                     @endif
                                 </div>
                             </div>
-                            @if($festival->festival_score)
-                                <div class="text-2xl font-semibold text-[var(--accent)] tabular-nums">{{ $festival->festival_score }}</div>
+                            @if($festival->compositeScore !== null)
+                                <div class="text-2xl font-semibold text-[var(--accent)] tabular-nums">{{ $festival->compositeScore }}</div>
                             @endif
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3 mb-3 text-xs">
-                            <div>
-                                <span class="text-[var(--text-faint)]">Deadline:</span>
-                                <span class="font-medium ml-1 tabular-nums
-                                    @if($festival->deadline && $festival->deadline->isPast()) text-[var(--text-faint)]
-                                    @elseif($festival->deadline && $festival->deadline->diffInDays(now()) < 14) text-[var(--danger)]
-                                    @else text-[var(--text-primary)] @endif">
-                                    {{ $festival->deadline?->format('M d, Y') ?? '—' }}
-                                </span>
+                        {{-- FestivalAPI returns null deadline_regular / event_start_date /
+                             regular_fee for many festivals whose dates aren't published yet
+                             (verified 2026-08-10: Sitges, Bilbao Fantasy, Terrassa Horror all
+                             come back with all three fields null from both list and detail
+                             endpoints). When every column would be "—" we collapse the grid
+                             into a single contextual message instead of three dead dashes. --}}
+                        @php
+                            $hasAnyDate = $festival->eventStartDate !== null
+                                || $festival->deadline !== null
+                                || $festival->regularFee !== null;
+                        @endphp
+                        @if($hasAnyDate)
+                            <div class="grid grid-cols-3 gap-3 mb-3 text-xs">
+                                <div>
+                                    <div class="text-[var(--text-faint)] mb-0.5">Apertura</div>
+                                    <div class="font-medium tabular-nums text-[var(--success)]">
+                                        {{ $festival->eventStartDate?->format('M d, Y') ?? '—' }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-[var(--text-faint)] mb-0.5">Deadline</div>
+                                    <div class="font-medium tabular-nums
+                                        @if($festival->deadline && $festival->deadline->isPast()) text-[var(--text-faint)]
+                                        @elseif($festival->deadline && $festival->deadline->diffInDays(now()) < 14) text-[var(--danger)]
+                                        @else text-[var(--text-primary)] @endif">
+                                        {{ $festival->deadline?->format('M d, Y') ?? '—' }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-[var(--text-faint)] mb-0.5">Fee</div>
+                                    <div class="font-medium tabular-nums text-[var(--text-primary)]">
+                                        @if($festival->regularFee !== null) ${{ number_format($festival->regularFee, 2) }} @else — @endif
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <span class="text-[var(--text-faint)]">Fee:</span>
-                                <span class="font-medium ml-1 tabular-nums">
-                                    @if($festival->submission_fee) ${{ number_format($festival->submission_fee, 2) }} @else — @endif
-                                </span>
-                            </div>
-                        </div>
+                        @else
+                            <p class="text-xs text-[var(--text-faint)] mb-3">
+                                Fechas no publicadas · visitá el sitio del festival para confirmar.
+                            </p>
+                        @endif
 
-                        @if(isset($festival->details['genres']) && is_array($festival->details['genres']) && count($festival->details['genres']) > 0)
+                        {{-- Prefer genres; fall back to categories (FestivalAPI often
+                             returns genres=[] for festivals whose only classification
+                             is at the category level, e.g. Sitges is horror/fantasy/sci_fi
+                             but reports no genres). Humanize the slugs ("sci_fi" → "Sci fi"). --}}
+                        @php
+                            $chips = count($festival->genres) > 0
+                                ? $festival->genres
+                                : $festival->categories;
+                            $chips = array_slice($chips, 0, 5);
+                            $humanize = fn (string $s) => ucfirst(str_replace('_', ' ', $s));
+                        @endphp
+                        @if(count($chips) > 0)
                             <div class="flex flex-wrap gap-1.5 mb-4">
-                                @foreach(array_slice($festival->details['genres'], 0, 5) as $genre)
+                                @foreach($chips as $chip)
                                     <span class="px-2 py-0.5 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-full text-[var(--text-secondary)]">
-                                        {{ $genre }}
+                                        {{ $humanize($chip) }}
                                     </span>
                                 @endforeach
                             </div>
                         @endif
 
                         <div class="flex items-center gap-3 pt-3 border-t border-[var(--border-color)]">
-                            <a href="{{ route('festivals.show', $festival) }}" class="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                                Ver detalles del festival →
+                            <a href="{{ route('festivals.redirect', ['apiId' => $festival->apiId]) }}" target="_blank" rel="noopener" class="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                                Ver sitio del festival →
                             </a>
                             <form action="{{ route('festivals.subscribe') }}" method="POST" class="ml-auto">
                                 @csrf
-                                <input type="hidden" name="festival_api_id" value="{{ $festival->api_id }}">
+                                <input type="hidden" name="festival_api_id" value="{{ $festival->apiId }}">
                                 <input type="hidden" name="notification_type" value="both">
                                 <button type="submit" class="cinema-btn px-4 py-2 text-xs">
                                     + Suscribirme
@@ -144,6 +178,42 @@
                     </article>
                 @endforeach
             </div>
+
+            {{-- Pagination — same list call serves all pages (1h cache), so
+                 flipping pages costs 0 FestivalAPI credits. Only the top
+                 5 matches get detail-enriched; the rest show with list-endpoint
+                 data only (chips via categories fallback still work). --}}
+            @if($totalPages > 1)
+                <div class="mt-6 pt-6 border-t border-[var(--border-color)] flex items-center justify-between">
+                    <div class="text-xs text-[var(--text-faintest)] tabular-nums">
+                        Página {{ $currentPage }} de {{ $totalPages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        @if($currentPage > 1)
+                            <a href="{{ route('productions.matches', array_merge(['production' => $production, 'page' => $currentPage - 1])) }}"
+                                class="cinema-btn-outline px-3 py-1.5 text-xs">
+                                ← Anterior
+                            </a>
+                        @else
+                            <button type="button" disabled
+                                class="cinema-btn-outline px-3 py-1.5 text-xs disabled:opacity-40 disabled:cursor-not-allowed">
+                                ← Anterior
+                            </button>
+                        @endif
+                        @if($currentPage < $totalPages)
+                            <a href="{{ route('productions.matches', array_merge(['production' => $production, 'page' => $currentPage + 1])) }}"
+                                class="cinema-btn-outline px-3 py-1.5 text-xs">
+                                Siguiente →
+                            </a>
+                        @else
+                            <button type="button" disabled
+                                class="cinema-btn-outline px-3 py-1.5 text-xs disabled:opacity-40 disabled:cursor-not-allowed">
+                                Siguiente →
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            @endif
         @endif
     </main>
 

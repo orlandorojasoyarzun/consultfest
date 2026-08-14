@@ -122,31 +122,30 @@
                 </div>
 
                 <div class="cinema-card p-6">
-                    <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Año</label>
-                    <input type="number" name="production_year" value="{{ old('production_year', $production->production_year) }}"
-                        min="1900" max="2100" class="cinema-input w-full px-4 py-2.5 text-sm tabular-nums">
+                    <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Estado de la producción</label>
+                    <select name="status" class="cinema-input w-full px-4 py-2.5 text-sm">
+                        @foreach(['draft', 'active', 'archived'] as $st)
+                            <option value="{{ $st }}" @selected(old('status', $production->status ?? 'draft') === $st)>
+                                {{ ucfirst($st) }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 
-            <div class="cinema-card p-6">
-                <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Géneros</label>
-                <p class="text-xs text-[var(--text-faint)] mb-3">Separa con comas. Ej: drama, horror, thriller</p>
-                <input type="text" name="genres_text"
-                    value="{{ old('genres_text', is_array($production->genres) ? implode(', ', $production->genres) : '') }}"
-                    class="cinema-input w-full px-4 py-2.5 text-sm">
-                {{-- Server-side: the controller reads 'genres_text', splits on commas, trims, dedupes. --}}
-            </div>
-
-            <div class="cinema-card p-6">
-                <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Estado</label>
-                <select name="status" class="cinema-input w-full px-4 py-2.5 text-sm">
-                    @foreach(['draft', 'active', 'archived'] as $st)
-                        <option value="{{ $st }}" @selected(old('status', $production->status ?? 'draft') === $st)>
-                            {{ ucfirst($st) }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+            {{-- Año: removed from the form on 2026-08-10. The Production
+                 model still has a `production_year` column and the controller
+                 still accepts it, so the data lives on if it was set before,
+                 but the UI no longer asks for it. Re-enable by pasting back
+                 the cinema-card block.
+                 Label "Estado" → "Estado de la producción" on 2026-08-10 to
+                 avoid confusion with a country's state/region. The form
+                 field name is still `status` (unchanged). --}}
+            {{-- Géneros: removed from the form on 2026-08-10. The Production
+                 model still has a `genres` column and the controller still
+                 accepts `genres_text`, so the data lives on if it was set
+                 before, but the UI no longer asks for it. Re-enable by
+                 pasting back the cinema-card block. --}}
 
             <div class="flex items-center gap-3 pt-2">
                 <button type="submit" class="cinema-btn px-6 py-3 text-sm">
