@@ -63,6 +63,10 @@ COPY composer.json composer.lock ./
 COPY artisan ./
 COPY bootstrap/app.php ./bootstrap/app.php
 COPY bootstrap/providers.php ./bootstrap/providers.php
+# `php artisan package:discover` (runs during composer install) loads the app,
+# which boots RouteServiceProvider → requires routes/api.php and routes/web.php.
+# We copy them explicitly so they're present BEFORE composer install runs.
+COPY routes ./routes
 # bootstrap/cache/ is required by Laravel at runtime (package:discover writes
 # services.php and packages.php into it). The dir is empty in git (only its
 # inner .gitignore is tracked), so we create it here.
