@@ -68,6 +68,18 @@ COPY bootstrap/providers.php ./bootstrap/providers.php
 # inner .gitignore is tracked), so we create it here.
 RUN mkdir -p /app/bootstrap/cache && chmod 775 /app/bootstrap/cache
 
+# storage/framework/{views,cache,sessions} are also gitignored-empty in this
+# repo. Laravel's View Compiler needs storage/framework/views to exist BEFORE
+# `php artisan package:discover` runs (Livewire v4 boots something that touches
+# the view compiler). Same story for sessions/cache — created lazily at runtime
+# but the dirs must exist. Logs dir is for Laravel's logger.
+RUN mkdir -p \
+        /app/storage/framework/views \
+        /app/storage/framework/cache/data \
+        /app/storage/framework/sessions \
+        /app/storage/logs \
+    && chmod -R 775 /app/storage /app/bootstrap/cache
+
 # Debug: confirm what's actually in the image before composer runs.
 RUN ls -la /app/ && echo "---BOOTSTRAP---" && ls -la /app/bootstrap/
 
