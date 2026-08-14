@@ -57,11 +57,10 @@ WORKDIR /app
 # composer install.
 COPY composer.json composer.lock ./
 COPY artisan ./
-COPY bootstrap ./bootstrap
+COPY bootstrap/app.php ./bootstrap/app.php
+COPY bootstrap/providers.php ./bootstrap/providers.php
 
 # Debug: confirm what's actually in the image before composer runs.
-# If bootstrap/app.php is missing here, the build log will show it and we'll
-# know whether the COPY is the problem or something else.
 RUN ls -la /app/ && echo "---BOOTSTRAP---" && ls -la /app/bootstrap/
 
 RUN composer install --no-interaction --optimize-autoloader --prefer-dist
