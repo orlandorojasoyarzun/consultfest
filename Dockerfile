@@ -38,11 +38,7 @@ RUN apt-get update \
     && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
         | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "Types: deb
-URIs: https://deb.nodesource.com/node_22.x
-Suites: nodistro
-Components: main
-Signed-By: /etc/apt/keyrings/nodesource.gpg" \
+    && printf 'Types: deb\nURIs: https://deb.nodesource.com/node_22.x\nSuites: nodistro\nComponents: main\nSigned-By: /etc/apt/keyrings/nodesource.gpg\n' \
         > /etc/apt/sources.list.d/nodesource.sources \
     && apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
