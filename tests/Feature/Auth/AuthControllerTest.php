@@ -3,8 +3,10 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\Subscriber;
+use App\Notifications\WelcomeNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class AuthControllerTest extends TestCase
@@ -263,6 +265,42 @@ class AuthControllerTest extends TestCase
         $this->assertDatabaseCount('subscribers', 0);
     }
 
+    public function test_register_sends_welcome_notification_to_new_subscriber(): void
+    {
+        Notification::fake();
+
+        $response = $this->post(route('auth.register.process'), [
+            'name' => 'Lara',
+            'last_name' => 'López',
+            'production_company' => 'Lara Films',
+            'email' => 'lara-welcome@example.com',
+            'password' => 'correctpassword',
+            'password_confirmation' => 'correctpassword',
+        ]);
+
+        $response->assertRedirect(route('dashboard'));
+
+        $subscriber = Subscriber::where('email', 'lara-welcome@example.com')->first();
+        $this->assertNotNull($subscriber);
+
+        Notification::assertSentTo($subscriber, WelcomeNotification::class);
+    }
+
+    public function test_register_does_not_send_welcome_on_validation_failure(): void
+    {
+        Notification::fake();
+
+        // Missing password → validation fails → no subscriber created, no email sent.
+        $response = $this->from(route('auth.register'))->post(route('auth.register.process'), [
+            'name' => 'Incompleto',
+            'email' => 'incompleto@example.com',
+        ]);
+
+        $response->assertSessionHasErrors(['password']);
+
+        Notification::assertNothingSent();
+    }
+
     // ---- Integration sanity check ---------------------------------------
 
     public function test_after_login_dashboard_renders(): void
@@ -278,5 +316,38 @@ class AuthControllerTest extends TestCase
         ])->assertRedirect(route('dashboard'));
 
         $this->get(route('dashboard'))->assertStatus(200);
+    }
+
+    // ---- Welcome email content ------------------------------------------
+
+    /**
+     * The welcome notification's mail payload must always carry the right
+     * subject, greeting (with the user's name), and CTA — regardless of
+     * which mailer (log in dev, Resend in prod) actually delivers it.
+     * This is the CI-level guard so a regression in toMail() can't ship
+     * unnoticed while Resend is rejecting sends (every send goes to
+     * failed_jobs and the failure is easy to miss when you're focused
+     * on the queue worker).
+     */
+    public function test_welcome_notification_builds_the_expected_mail_payload(): void
+    {
+        $subscriber = Subscriber::factory()->create([
+            'name' => 'Mariana',
+            'email' => 'mariana@example.com',
+        ]);
+
+        $notification = new WelcomeNotification($subscriber);
+        $mailMessage = $notification->toMail($subscriber);
+
+        // MailMessage extends SimpleMessage, which exposes all the rendered
+        // fields as public props. Inspecting them directly is the supported
+        // way to assert what will land in the recipient's inbox.
+        $this->assertSame('¡Bienvenido a Consultfest!', $mailMessage->subject);
+        $this->assertStringContainsString('Mariana', (string) $mailMessage->greeting);
+        $introBlob = strtolower(implode(' ', $mailMessage->introLines));
+        $this->assertStringContainsString('buscar festivales', $introBlob);
+        $this->assertStringContainsString('deadlines', $introBlob);
+        $this->assertSame(url('/dashboard'), $mailMessage->actionUrl);
+        $this->assertSame('Ir a mi panel', $mailMessage->actionText);
     }
 }

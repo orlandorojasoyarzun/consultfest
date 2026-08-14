@@ -27,14 +27,14 @@ class FestivalOpeningNotification extends Notification implements ShouldQueue
         $openingDate = $this->festival->opening_date->format('M d, Y');
 
         return (new MailMessage)
-            ->subject("🎬 Festival Opens in {$this->daysAhead} days: {$this->festival->name}")
-            ->greeting("Hello {$notifiable->name},")
-            ->line("**{$this->festival->name}** opens for submissions in **{$this->daysAhead} days** ({$openingDate}).")
-            ->line("**Category:** {$this->festival->category}")
-            ->line("**Country:** {$this->festival->country}")
-            ->line("**Submission Fee:** $" . number_format($this->festival->submission_fee, 2))
-            ->action('View Festival Details', url('/festivals/' . $this->festival->id))
-            ->line('Start preparing your submission materials!');
+            ->subject("Festival abre en {$this->daysAhead} días: {$this->festival->name}")
+            ->greeting("Hola {$notifiable->name},")
+            ->line("**{$this->festival->name}** abre para admisiones en **{$this->daysAhead} días** ({$openingDate}).")
+            ->line("**Categoría:** {$this->festival->category}")
+            ->line("**País:** {$this->festival->country}")
+            ->line("**Tasa de admisión:** $" . number_format($this->festival->submission_fee, 2))
+            ->action('Ver los detalles del festival', url('/festivals/' . $this->festival->id))
+            ->line('Empieza a preparar tu postulación!');
     }
 
     public function toArray(object $notifiable): array

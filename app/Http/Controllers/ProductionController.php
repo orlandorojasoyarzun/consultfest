@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Production;
 use App\Models\Subscriber;
+use App\Notifications\ProductionCreatedNotification;
 use App\Services\ProductionMatcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -87,6 +88,13 @@ class ProductionController extends Controller
 
         $production = Production::create($data);
 
+        // Confirmation email — queued. Tells the user the record landed
+        // and points them to the production page so they can keep iterating.
+        $subscriber = Subscriber::find($subscriberId);
+        if ($subscriber) {
+            $subscriber->notify(new ProductionCreatedNotification($production));
+        }
+
         return redirect()->route('productions.show', $production)
             ->with('production-flash', 'Producción creada.');
     }
@@ -121,11 +129,25 @@ class ProductionController extends Controller
             abort(403);
         }
 
-        $festivals = $this->matcher->matchFor($production);
+        // Page through the matcher's pool. The matcher already does the
+        // expensive work (1 list + 5 details) once per cold-cache visit;
+        // paginating here is just a slice, no extra API calls.
+        $perPage = 5;
+        $page = max(1, (int) $request->query('page', 1));
+
+        $all = $this->matcher->matchFor($production);
+        $total = $all->count();
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+
+        $festivals = $all->slice(($page - 1) * $perPage, $perPage)->values();
 
         return view('productions.matches', [
             'production' => $production,
             'festivals' => $festivals,
+            'currentPage' => $page,
+            'totalPages' => $totalPages,
+            'totalMatches' => $total,
         ]);
     }
 

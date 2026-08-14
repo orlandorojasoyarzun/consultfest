@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Subscriber;
+use App\Notifications\WelcomeNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
@@ -116,6 +117,11 @@ class AuthController extends Controller
             'password' => $validated['password'],
             'notifications_enabled' => true,
         ]);
+
+        // Welcome email — queued so it doesn't block the response. The user
+        // gets redirected to /dashboard immediately; the email goes out
+        // async via the queue worker.
+        $subscriber->notify(new WelcomeNotification($subscriber));
 
         session()->regenerate();
         session(['subscriber_id' => $subscriber->id]);
