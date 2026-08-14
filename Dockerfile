@@ -90,8 +90,10 @@ RUN ls -la /app/ && echo "---BOOTSTRAP---" && ls -la /app/bootstrap/
 RUN composer install --no-interaction --optimize-autoloader --prefer-dist
 
 # Then pnpm deps (the project uses pnpm — see pnpm-lock.yaml v9.0).
-# corepack is bundled with Node.js ≥16, so no extra install needed.
-RUN corepack enable && corepack prepare pnpm@9 --activate
+# Debian Bookworm's nodejs package (Node 18.x) ships corepack but it's been
+# deprecated to a stub in some builds — installing pnpm via npm directly is
+# more reliable across Debian versions.
+RUN npm install -g pnpm@9
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
