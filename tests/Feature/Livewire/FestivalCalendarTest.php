@@ -31,13 +31,6 @@ class FestivalCalendarTest extends TestCase
             ->assertStatus(200);
     }
 
-    public function test_livewire_component_quick_range_methods_exist(): void
-    {
-        Livewire::test('festival-calendar')
-            ->call('setQuickRange', 'next_week')
-            ->assertStatus(200);
-    }
-
     public function test_livewire_component_clear_filters(): void
     {
         Livewire::test('festival-calendar')

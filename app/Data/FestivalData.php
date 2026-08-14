@@ -93,12 +93,33 @@ class FestivalData
     }
 
     /**
-     * Best URL to send the user to when they click the card. Falls back
-     * through submission_url → website → null.
+     * URL to send the user to when they click the card.
+     *
+     * Trust order:
+     *   1. submission_url  — organizer's submission form (FilmFreeway,
+     *      Google Form, custom site, …) — what filmmakers actually want.
+     *   2. website         — organizer's home page. Less specific but
+     *      usually the same domain as #1.
+     *   3. FilmFreeway search built from the festival name. Last resort
+     *      because the list endpoint mis-maps these fields to other
+     *      festivals' slugs; only the detail endpoint returns trustworthy
+     *      URLs. The DTO coming out of FestivalSearchService::details()
+     *      will already have a real submission_url/website, so this
+     *      fallback only fires when the detail call wasn't made (e.g.
+     *      the list view before enrichment, or a detail-call failure).
      */
     public function bestUrl(): ?string
     {
-        return $this->submissionUrl ?: $this->website;
+        if ($this->submissionUrl !== null && $this->submissionUrl !== '') {
+            return $this->submissionUrl;
+        }
+        if ($this->website !== null && $this->website !== '') {
+            return $this->website;
+        }
+        if ($this->name === '') {
+            return null;
+        }
+        return 'https://filmfreeway.com/search?q=' . rawurlencode($this->name);
     }
 
     private static function parseDate(mixed $value): ?Carbon

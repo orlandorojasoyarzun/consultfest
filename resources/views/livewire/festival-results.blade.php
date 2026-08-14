@@ -34,10 +34,14 @@
         </div>
         <div class="space-y-2">
             @foreach($festivals as $festival)
-                @php $href = $festival->bestUrl(); @endphp
+                {{-- Lazy enrichment: the card links to a server-side redirect
+                     that triggers FestivalSearchService::details() (1 credit,
+                     24h cached per apiId) and 302s to the real organizer URL.
+                     Browsing the list itself stays at 1 credit (list call)
+                     regardless of pagination — we only spend when the user
+                     signals intent by clicking. --}}
                 <a
-                    href="{{ $href ?: '#' }}"
-                    @if($href) target="_blank" rel="noopener noreferrer" @endif
+                    href="{{ route('festivals.redirect', ['apiId' => $festival->apiId]) }}"
                     class="block cinema-card p-6 hover:border-[var(--border-hover)] group"
                 >
                     <div class="flex items-start justify-between gap-6">
@@ -126,8 +130,28 @@
             @endforeach
         </div>
 
-        <div class="mt-6 pt-6 border-t border-[var(--border-color)]">
-            {{ $paginator->links() }}
+        <div class="mt-6 pt-6 border-t border-[var(--border-color)] flex items-center justify-between">
+            <div class="text-xs text-[var(--text-faintest)] tabular-nums">
+                Página {{ $currentPage }} de {{ $totalPages }}
+            </div>
+            <div class="flex items-center gap-2">
+                <button
+                    type="button"
+                    wire:click="previousPage"
+                    @disabled($currentPage <= 1)
+                    class="cinema-btn-outline px-3 py-1.5 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                    ← Anterior
+                </button>
+                <button
+                    type="button"
+                    wire:click="nextPage"
+                    @disabled($currentPage >= $totalPages)
+                    class="cinema-btn-outline px-3 py-1.5 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                    Siguiente →
+                </button>
+            </div>
         </div>
     @endif
 </div>

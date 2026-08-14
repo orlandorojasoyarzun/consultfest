@@ -67,6 +67,27 @@ class FestivalApiService
 
     public function syncFestivalDetails(int $apiId): ?array
     {
+        $data = $this->getFestivalDetails($apiId);
+        if ($data !== null) {
+            $this->upsertFestival($data, true);
+        }
+        return $data;
+    }
+
+    /**
+     * Read-only fetch of a single festival's full detail payload.
+     *
+     * Costs 1 FestivalAPI credit per call (no batch endpoint). The full
+     * detail is the only place we can trust `submission_url`/`website` —
+     * the list endpoint returns these fields mis-mapped to other festivals
+     * (verified 2026-08-09 with Almeria → AlmeriaWesternFilmFestival).
+     *
+     * Returns null on any error so callers degrade gracefully — the
+     * caller (FestivalSearchService::details) will fall back to building
+     * a search URL from the festival name.
+     */
+    public function getFestivalDetails(int $apiId): ?array
+    {
         try {
             $response = Http::timeout($this->timeout)
                 ->withHeaders([
@@ -76,12 +97,15 @@ class FestivalApiService
                 ->get("{$this->baseUrl}/festivals/{$apiId}/");
 
             if ($response->successful()) {
-                $data = $response->json();
-                $this->upsertFestival($data, true);
-                return $data;
+                return $response->json();
             }
+
+            Log::warning('FestivalAPI detail non-2xx', [
+                'api_id' => $apiId,
+                'status' => $response->status(),
+            ]);
         } catch (\Exception $e) {
-            Log::error('FestivalAPI detail sync failed', [
+            Log::error('FestivalAPI detail exception', [
                 'api_id' => $apiId,
                 'error' => $e->getMessage(),
             ]);
