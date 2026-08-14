@@ -47,7 +47,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 # Install PHP deps in their own layer so editing app code doesn't bust the cache.
-COPY composer.json composer.lock ./
+# We copy composer.json + lockfile + artisan + bootstrap together because composer's
+# post-install script runs `php artisan package:discover`, which needs artisan and
+# bootstrap/app.php to exist already.
+COPY composer.json composer.lock artisan bootstrap ./
+
 RUN composer install --no-interaction --optimize-autoloader --prefer-dist
 
 # Then pnpm deps (the project uses pnpm — see pnpm-lock.yaml v9.0).
