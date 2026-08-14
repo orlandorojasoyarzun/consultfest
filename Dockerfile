@@ -15,8 +15,8 @@ FROM php:8.4-cli-bookworm
 #   git             → composer needs it for some package metadata
 #   curl, zip, unzip → utility tools (composer install, archive handling)
 #   libpng/libonig/libxml/libzip-dev → headers for gd/mbstring/zip
+#   libpq-dev       → headers + client library for pdo_pgsql (libpq-fe.h, libpq.so)
 #   nodejs + npm    → frontend build (Tailwind v4 via Vite)
-#   postgresql-client → pg_isready for health checks (optional)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
@@ -27,9 +27,9 @@ RUN apt-get update \
         libonig-dev \
         libxml2-dev \
         libzip-dev \
+        libpq-dev \
         nodejs \
         npm \
-        postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions Laravel + Postgres need:
