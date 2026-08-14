@@ -18,9 +18,10 @@ FROM php:8.4-cli-bookworm
 #   libpq-dev       → headers + client library for pdo_pgsql (libpq-fe.h, libpq.so)
 #   ca-certificates, gnupg → needed to add NodeSource repo for Node 20+
 #
-# We install Node 20+ from NodeSource because Debian Bookworm ships Node 18,
-# and rolldown (Vite's bundler in v4+) requires Node 20+'s `node:util` API
-# (`styleText` export). Node 18 makes `pnpm run build` fail at import time.
+# We install Node 22 from NodeSource because Debian Bookworm ships Node 18,
+# and rolldown (Vite's bundler in v4+) requires a recent Node's `node:util`
+# API (`styleText` export). NodeSource deprecates Node 20, so we use Node 22
+# (current LTS).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
@@ -37,7 +38,7 @@ RUN apt-get update \
     && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
         | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x bookworm main" \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x bookworm main" \
         > /etc/apt/sources.list.d/nodesource.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
