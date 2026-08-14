@@ -50,15 +50,18 @@ WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-interaction --optimize-autoloader --prefer-dist
 
-# Then npm deps.
-COPY package.json package-lock.json ./
-RUN npm ci
+# Then pnpm deps (the project uses pnpm — see pnpm-lock.yaml v9.0).
+# corepack is bundled with Node.js ≥16, so no extra install needed.
+RUN corepack enable && corepack prepare pnpm@9 --activate
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Finally the rest of the app code.
 COPY . .
 
 # Build frontend assets (Tailwind v4 / Vite → public/build).
-RUN npm run build
+RUN pnpm run build
 
 # Railway sets $PORT dynamically. Default to 8000 for parity with artisan serve.
 EXPOSE 8000
