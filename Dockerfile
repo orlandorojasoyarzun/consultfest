@@ -114,7 +114,10 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Build frontend assets (Tailwind v4 / Vite → public/build).
-RUN pnpm run build \
+# --verbose forces Vite to log every step. Without it, Vite only logs in
+# interactive terminals and silently exits non-zero in CI/Docker — making
+# builds "succeed" while producing nothing.
+RUN pnpm run build --verbose \
     && ls -la /app/public/build/ \
     && ls -la /app/public/build/assets/ 2>/dev/null | head -20
 
