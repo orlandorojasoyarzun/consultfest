@@ -15,14 +15,32 @@ class FestivalResultsTest extends TestCase
 
     /**
      * Build a FestivalAPI-shaped results array for the given names + dates.
+     *
+     * Fakes BOTH endpoints — list and per-festival detail. The list
+     * pattern ends with a star so it matches the URL even when FestivalAPI
+     * appends a query string (deadline_after=...).
      */
     private function fakeApiResults(array $rows): void
     {
+        $listResponse = Http::response([
+            'count' => count($rows),
+            'results' => $rows,
+        ], 200);
+
         Http::fake([
-            'https://festivalapi.com/v1/festivals*' => Http::response([
-                'count' => count($rows),
-                'results' => $rows,
-            ], 200),
+            'https://festivalapi.com/v1/festivals/*/' => function ($request) use ($rows) {
+                preg_match('#/festivals/(\d+)/#', $request->url(), $m);
+                $id = (int) ($m[1] ?? 0);
+                $row = collect($rows)->firstWhere('id', $id) ?? ($rows[0] ?? []);
+                return Http::response([
+                    'id' => $row['id'] ?? 0,
+                    'name' => $row['name'] ?? 'Unknown',
+                    'categories' => $row['categories'] ?? [],
+                    'submission_url' => '',
+                    'website' => '',
+                ], 200);
+            },
+            'https://festivalapi.com/v1/festivals*' => $listResponse,
         ]);
     }
 
@@ -129,17 +147,28 @@ class FestivalResultsTest extends TestCase
         }
         $this->fakeApiResults($rows);
 
-        // Page 1: total count is 25 (visible in template).
+        // Total count is 25 across all pages, sliced into 3 pages of 10/10/5.
         $component = Livewire::test(FestivalResults::class);
         $component->assertSee('25 festivales', false);
-        $component->assertSee('Fest 10');
+        $component->assertSee('Página 1 de 3', false);
 
-        // Navigate to page 2 — first festival on this page is Fest 11,
-        // last is Fest 20.
+        // Page 1 shows exactly 10 of the 25 festivals.
+        $page1Items = collect($component->viewData('festivals'));
+        $this->assertCount(10, $page1Items);
+
+        // Navigate to page 2 — different 10 festivals appear, disjoint
+        // from page 1. (We don't assert specific names because the order
+        // is apiId-ascending, which is an implementation detail of
+        // FestivalSearchService::sortKey.)
         $component->call('gotoPage', 2);
-        $component->assertSee('Fest 11');
-        $component->assertSee('Fest 20');
-        $component->assertSet('paginators.page', 2);
+        $page2Items = collect($component->viewData('festivals'));
+        $this->assertCount(10, $page2Items);
+
+        $page1Names = $page1Items->pluck('name')->all();
+        $page2Names = $page2Items->pluck('name')->all();
+        $this->assertEmpty(array_intersect($page1Names, $page2Names));
+
+        $component->assertSee('Página 2 de 3', false);
     }
 
     public function test_search_resets_pagination_to_page_one(): void
@@ -151,13 +180,15 @@ class FestivalResultsTest extends TestCase
         $this->fakeApiResults($rows);
 
         $component = Livewire::test(FestivalResults::class)
-            ->call('gotoPage', 2);
+            ->call('gotoPage', 2)
+            ->assertSet('page', 2);
 
         $component->call('search', [
             'startDate' => now()->subDay()->toDateString(),
             'endDate' => now()->addYear()->toDateString(),
         ])
-            ->assertSee('Mostrando', false);
+            ->assertSee('Página 1 de 2', false)
+            ->assertSet('page', 1);
     }
 
     public function test_search_resets_loading_state(): void

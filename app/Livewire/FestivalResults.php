@@ -4,15 +4,11 @@ namespace App\Livewire;
 
 use App\Services\FestivalRateLimitException;
 use App\Services\FestivalSearchService;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Component;
-use Livewire\WithPagination;
 
 class FestivalResults extends Component
 {
-    use WithPagination;
-
     /**
      * Latest filters applied to the result set. Captured by the latest
      * `search-festivals` dispatch so pagination reuses them.
@@ -22,6 +18,18 @@ class FestivalResults extends Component
     public array $filters = [];
 
     public bool $isLoading = false;
+
+    /**
+     * Current page of the local paginator. We don't use Livewire's
+     * WithPagination because the underlying source is a Collection (the
+     * API returns up to 100 items, no real DB query). Slicing client-side
+     * with a tracked page number keeps the URL clean (no ?page= param) and
+     * avoids the MethodNotAllowedHttpException you get when
+     * $paginator->links() renders <a href> against the livewire/update route.
+     */
+    public int $page = 1;
+
+    private const PER_PAGE = 10;
 
     /**
      * True when the last search was throttled by our internal rate-limit.
@@ -57,9 +65,24 @@ class FestivalResults extends Component
         // user clicks "next".
         $this->filters = $filters;
         // New search means we're back on page 1.
-        $this->resetPage();
+        $this->page = 1;
 
         $this->isLoading = false;
+    }
+
+    public function gotoPage(int $page): void
+    {
+        $this->page = max(1, $page);
+    }
+
+    public function nextPage(): void
+    {
+        $this->page++;
+    }
+
+    public function previousPage(): void
+    {
+        $this->page = max(1, $this->page - 1);
     }
 
     public function render()
@@ -74,46 +97,32 @@ class FestivalResults extends Component
             $this->isRateLimited = true;
         }
 
-        // FestivalAPI returns up to 100 results, no pagination. We slice
-        // locally to fit the 10-per-page UI. WithPagination's `gotoPage`
-        // mutates $paginators['page']; reading it via getPage() honors it.
-        $perPage = 10;
-        $page = $this->getPage();
-        $items = $results->slice(($page - 1) * $perPage, $perPage)->values();
+        // FestivalAPI returns up to 100 results. We slice locally to fit
+        // the 10-per-page UI.
+        $perPage = self::PER_PAGE;
+        $totalPages = max(1, (int) ceil($results->count() / $perPage));
+        // Defensive: a stale $page from a previous larger result set could
+        // point past the end. Clamp it.
+        $this->page = min($this->page, $totalPages);
 
-        $paginator = new LengthAwarePaginator(
-            $items,
-            $results->count(),
-            $perPage,
-            $page,
-            [
-                'path' => request()->url(),
-                'pageName' => 'page',
-                'query' => request()->query(),
-            ],
-        );
+        $items = $results->slice(($this->page - 1) * $perPage, $perPage)
+            ->values();
+
+        // Detail enrichment used to happen here (1 credit per visible card,
+        // 10/page, 100/page if you paginate). At ~5 credits per real visit
+        // and the user's API budget, we switched to lazy enrichment:
+        // detail is only fetched when the user actually clicks "Suscribirme"
+        // or "Ver sitio" (see enrichAnd* methods). That keeps browsing the
+        // list at 1 credit (list call) and only spends 1 more when the user
+        // signals real intent — and it's cached 24h per apiId so the same
+        // festival on the same day stays free.
 
         return view('livewire.festival-results', [
-            'paginator' => $paginator,
             'totalCount' => $results->count(),
             'festivals' => $items,
+            'currentPage' => $this->page,
+            'totalPages' => $totalPages,
         ]);
-    }
-
-    /**
-     * Livewire's WithPagination hook: tells the framework which view to
-     * use for the paginator links. Our override lives in
-     * resources/views/vendor/pagination/tailwind.blade.php with Spanish
-     * labels.
-     */
-    public function paginationView(): string
-    {
-        return 'vendor.pagination.tailwind';
-    }
-
-    public function paginationSimpleView(): string
-    {
-        return 'vendor.pagination.simple-tailwind';
     }
 
     /**
@@ -121,6 +130,6 @@ class FestivalResults extends Component
      */
     public function getCurrentPage(): int
     {
-        return $this->getPage();
+        return $this->page;
     }
 }

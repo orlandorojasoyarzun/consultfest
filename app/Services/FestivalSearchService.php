@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Data\FestivalData;
+use Carbon\Carbon;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -29,11 +30,12 @@ class FestivalSearchService
 {
     /**
      * How long a successful response stays in cache. FestivalAPI updates
-     * continuously but with daily granularity, so 1h is the sweet spot:
-     * fresh enough for time-sensitive data, long enough that identical
-     * repeated searches cost zero credits.
+     * with daily granularity, so 24h is the sweet spot: fresh enough for
+     * time-sensitive data (deadlines, new festivals), long enough that
+     * identical repeated searches over the course of a day cost zero
+     * credits.
      */
-    private const CACHE_TTL_SECONDS = 3600;
+    private const CACHE_TTL_SECONDS = 86400;
 
     /**
      * Internal cap to avoid burning credits via scripted abuse. 30 req/min
@@ -84,6 +86,17 @@ class FestivalSearchService
         $results = collect($payload['results'] ?? [])
             ->map(fn (array $row) => FestivalData::fromApi($row))
             ->filter(fn (FestivalData $f) => $f->isAcceptingSubmissions())
+            // FestivalAPI does NOT honour `event_date_after/before` (verified
+            // 2026-08-09: with category=short_film + event_date_after=2026-12-01
+            // + event_date_before=2027-03-01 the API returned 20 results of
+            // which 13 had event_start_date outside the range). We filter
+            // client-side so the UI matches what the user asked for.
+            ->filter(fn (FestivalData $f) => $this->withinDateRange($f, $filters))
+            ->values()
+            // Order results by the same dateField the user picked. With no
+            // dateField (legacy) we fall back to deadline — the next
+            // submission closing date is the most actionable signal.
+            ->sortBy(fn (FestivalData $f) => $this->sortKey($f, $filters))
             ->values();
 
         try {
@@ -150,6 +163,56 @@ class FestivalSearchService
     }
 
     /**
+     * Fetch a single festival's detail payload (with submission_url,
+     * website, etc.) and return it as an enriched FestivalData.
+     *
+     * The list endpoint mis-maps submission_url/website to other festivals'
+     * slugs, so the only way to get the real organizer URL is to hit the
+     * detail endpoint — which costs 1 credit per call. We cache per apiId
+     * for the same 24h window as search results so revisiting the same
+     * festival in the same day costs nothing extra.
+     *
+     * If the detail call fails we return the input festival unchanged so
+     * the caller can still render a card with a search URL fallback.
+     */
+    public function details(FestivalData $festival): FestivalData
+    {
+        $cacheKey = 'festivalapi:details:' . $festival->apiId;
+
+        try {
+            $cached = Cache::get($cacheKey);
+            if ($cached instanceof FestivalData) {
+                return $cached;
+            }
+            if ($cached !== null) {
+                Cache::forget($cacheKey);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('FestivalSearchService: details cache read failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $payload = $this->api->getFestivalDetails($festival->apiId);
+
+        if ($payload === null) {
+            return $festival;
+        }
+
+        $enriched = FestivalData::fromApi($payload);
+
+        try {
+            Cache::put($cacheKey, $enriched, self::CACHE_TTL_SECONDS);
+        } catch (\Throwable $e) {
+            Log::warning('FestivalSearchService: details cache write failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $enriched;
+    }
+
+    /**
      * Internal rate-limit so a user hammering the search form can't burn
      * through FestivalAPI credits. We piggy-back on Laravel's RateLimiter
      * facade which is request-scoped.
@@ -171,5 +234,65 @@ class FestivalSearchService
         }
 
         $this->rateLimiter->hit($key, 60);
+    }
+
+    /**
+     * Post-fetch date filter. FestivalAPI ignores event_date_after/before
+     * but respects deadline_* filters, so we only need to defend ourselves
+     * for the "Apertura" dateField. If the user didn't ask for a date
+     * filter (legacy '' dateField) or asked by deadline, we trust the API.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function withinDateRange(FestivalData $festival, array $filters): bool
+    {
+        if (($filters['dateField'] ?? '') !== 'opening_date') {
+            return true;
+        }
+
+        // No event_start_date means we can't filter — be permissive.
+        if ($festival->eventStartDate === null) {
+            return true;
+        }
+
+        $start = !empty($filters['startDate']) ? Carbon::parse($filters['startDate']) : null;
+        $end = !empty($filters['endDate']) ? Carbon::parse($filters['endDate']) : null;
+
+        if ($start && $festival->eventStartDate->lt($start)) {
+            return false;
+        }
+        if ($end && $festival->eventStartDate->gt($end)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Sort key for a single festival. FestivalAPI does NOT honour event_date_*
+     * filters AND it does NOT honour any ordering on event_start_date vs
+     * deadline, so we sort client-side using the field the user picked.
+     *
+     * Sort key rules:
+     *   - dateField='opening_date' → eventStartDate (nulls last)
+     *   - dateField='deadline' (or '') → deadline (nulls last)
+     *   - We add apiId as a deterministic tiebreaker so two festivals with
+     *     the exact same date don't shuffle on every request.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function sortKey(FestivalData $festival, array $filters): array
+    {
+        $useEventDate = ($filters['dateField'] ?? '') === 'opening_date';
+        $date = $useEventDate ? $festival->eventStartDate : $festival->deadline;
+
+        // PHP's sortBy puts arrays with the smaller first element first.
+        // [0, timestamp] sorts before [1, timestamp], so we use 0 when the
+        // date is present and 1 when it's null — pushing unknowns to the end.
+        return [
+            $date === null ? 1 : 0,
+            $date?->timestamp ?? PHP_INT_MAX,
+            $festival->apiId,
+        ];
     }
 }

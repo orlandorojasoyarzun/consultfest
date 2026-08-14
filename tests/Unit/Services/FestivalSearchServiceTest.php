@@ -28,6 +28,10 @@ class FestivalSearchServiceTest extends TestCase
     private function fakeApi(array $results, int $status = 200): void
     {
         Http::fake([
+            // End with star so the URL matches even when FestivalAPI
+            // appends a query string (?deadline_after=...). Without the
+            // trailing star the bare /festivals pattern only matches
+            // the exact URL with no query string.
             'https://festivalapi.com/v1/festivals*' => Http::response([
                 'count' => count($results),
                 'results' => $results,
@@ -217,5 +221,298 @@ class FestivalSearchServiceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->makeService()->search([]);
+    }
+
+    /**
+     * Regression test for the "Apertura" bug (2026-08-09).
+     *
+     * FestivalAPI does NOT honour event_date_after/before. With category
+     * short_film + event_date_after=2026-12-01 + event_date_before=2027-03-01
+     * the API returned 20 festivals of which 13 had event_start_date outside
+     * the requested range. We post-filter to defend the user.
+     */
+    public function test_search_filters_by_event_start_date_when_dateField_is_opening_date(): void
+    {
+        $this->fakeApi([
+            [
+                'id' => 1,
+                'name' => 'In Range',
+                'categories' => ['short_film'],
+                'event_start_date' => '2027-01-15',
+                'deadline_regular' => Carbon::now()->addDays(60)->toDateString(),
+            ],
+            [
+                'id' => 2,
+                'name' => 'Before Range',
+                'categories' => ['short_film'],
+                'event_start_date' => '2026-09-10',
+                'deadline_regular' => Carbon::now()->addDays(60)->toDateString(),
+            ],
+            [
+                'id' => 3,
+                'name' => 'After Range',
+                'categories' => ['short_film'],
+                'event_start_date' => '2027-06-20',
+                'deadline_regular' => Carbon::now()->addDays(60)->toDateString(),
+            ],
+        ]);
+
+        $results = $this->makeService()->search([
+            'startDate' => '2026-12-01',
+            'endDate' => '2027-03-01',
+            'dateField' => 'opening_date',
+            'category' => 'short_film',
+        ]);
+
+        // Only "In Range" should survive the post-fetch filter.
+        $this->assertCount(1, $results);
+        $this->assertSame('In Range', $results->first()->name);
+    }
+
+    public function test_search_keeps_festival_without_event_start_date_when_dateField_is_opening_date(): void
+    {
+        // Defensive: if the API omits event_start_date we can't filter it
+        // out, so we keep it (better to show possibly-out-of-range data
+        // than to drop a real match silently).
+        $this->fakeApi([
+            [
+                'id' => 1,
+                'name' => 'No Apertura',
+                'categories' => ['short_film'],
+                'event_start_date' => null,
+                'deadline_regular' => Carbon::now()->addDays(60)->toDateString(),
+            ],
+        ]);
+
+        $results = $this->makeService()->search([
+            'startDate' => '2026-12-01',
+            'endDate' => '2027-03-01',
+            'dateField' => 'opening_date',
+        ]);
+
+        $this->assertCount(1, $results);
+        $this->assertSame('No Apertura', $results->first()->name);
+    }
+
+    public function test_search_does_not_filter_by_date_when_dateField_is_deadline(): void
+    {
+        // The deadline_* filter is honoured by the API, so we trust it
+        // and do NOT post-filter on event_start_date. We do still keep
+        // the past-deadline filter.
+        $this->fakeApi([
+            [
+                'id' => 1,
+                'name' => 'Before Apertura but valid',
+                'categories' => ['short_film'],
+                'event_start_date' => '2026-09-10',
+                'deadline_regular' => Carbon::now()->addDays(60)->toDateString(),
+            ],
+        ]);
+
+        $results = $this->makeService()->search([
+            'startDate' => '2026-12-01',
+            'endDate' => '2027-03-01',
+            'dateField' => 'deadline',
+        ]);
+
+        // Should be kept — dateField=deadline doesn't trigger the
+        // event_start_date post-filter.
+        $this->assertCount(1, $results);
+    }
+
+    public function test_search_orders_results_by_event_start_date_when_dateField_is_opening_date(): void
+    {
+        $this->fakeApi([
+            [
+                'id' => 1,
+                'name' => 'Apertura más lejana',
+                'categories' => ['short_film'],
+                'event_start_date' => '2027-02-15',
+                'deadline_regular' => Carbon::now()->addDays(120)->toDateString(),
+            ],
+            [
+                'id' => 2,
+                'name' => 'Apertura más próxima',
+                'categories' => ['short_film'],
+                'event_start_date' => '2026-12-05',
+                'deadline_regular' => Carbon::now()->addDays(120)->toDateString(),
+            ],
+            [
+                'id' => 3,
+                'name' => 'Apertura intermedia',
+                'categories' => ['short_film'],
+                'event_start_date' => '2027-01-20',
+                'deadline_regular' => Carbon::now()->addDays(120)->toDateString(),
+            ],
+        ]);
+
+        $results = $this->makeService()->search([
+            'startDate' => '2026-12-01',
+            'endDate' => '2027-03-01',
+            'dateField' => 'opening_date',
+        ]);
+
+        // Nearest first.
+        $this->assertSame('Apertura más próxima', $results[0]->name);
+        $this->assertSame('Apertura intermedia', $results[1]->name);
+        $this->assertSame('Apertura más lejana', $results[2]->name);
+    }
+
+    public function test_search_orders_results_by_deadline_when_dateField_is_deadline(): void
+    {
+        $this->fakeApi([
+            [
+                'id' => 1,
+                'name' => 'Deadline lejano',
+                'categories' => ['short_film'],
+                'deadline_regular' => Carbon::now()->addDays(180)->toDateString(),
+                'event_start_date' => null,
+            ],
+            [
+                'id' => 2,
+                'name' => 'Deadline cercano',
+                'categories' => ['short_film'],
+                'deadline_regular' => Carbon::now()->addDays(15)->toDateString(),
+                'event_start_date' => null,
+            ],
+            [
+                'id' => 3,
+                'name' => 'Deadline medio',
+                'categories' => ['short_film'],
+                'deadline_regular' => Carbon::now()->addDays(60)->toDateString(),
+                'event_start_date' => null,
+            ],
+        ]);
+
+        $results = $this->makeService()->search([
+            'dateField' => 'deadline',
+        ]);
+
+        $this->assertSame('Deadline cercano', $results[0]->name);
+        $this->assertSame('Deadline medio', $results[1]->name);
+        $this->assertSame('Deadline lejano', $results[2]->name);
+    }
+
+    public function test_search_pushes_festivals_without_date_to_the_end(): void
+    {
+        $this->fakeApi([
+            [
+                'id' => 1,
+                'name' => 'Sin fecha',
+                'categories' => ['short_film'],
+                'event_start_date' => null,
+                'deadline_regular' => Carbon::now()->addDays(60)->toDateString(),
+            ],
+            [
+                'id' => 2,
+                'name' => 'Con fecha',
+                'categories' => ['short_film'],
+                'event_start_date' => '2027-01-15',
+                'deadline_regular' => Carbon::now()->addDays(60)->toDateString(),
+            ],
+        ]);
+
+        $results = $this->makeService()->search([
+            'dateField' => 'opening_date',
+        ]);
+
+        // The one with a real event_start_date comes first.
+        $this->assertSame('Con fecha', $results[0]->name);
+        $this->assertSame('Sin fecha', $results[1]->name);
+    }
+
+    public function test_details_returns_enriched_festival_with_real_submission_url(): void
+    {
+        // The list endpoint often returns null or a wrong submission_url.
+        // details() must hit the detail endpoint and return a DTO whose
+        // bestUrl() resolves to the real organizer URL — the bug fix that
+        // stops users seeing "Private Project" on every card.
+        Http::fake([
+            'https://festivalapi.com/v1/festivals/42/' => Http::response([
+                'id' => 42,
+                'name' => 'Sitges Film Festival',
+                'categories' => ['feature'],
+                'submission_url' => 'https://sitgesfilmfestival.com/submit',
+                'website' => 'https://sitgesfilmfestival.com',
+            ], 200),
+        ]);
+
+        $input = new FestivalData(
+            apiId: 42,
+            name: 'Sitges Film Festival',
+            categories: ['feature'],
+            primaryCategory: 'feature',
+            country: 'Spain',
+            city: null,
+            state: null,
+            genres: [],
+            deadline: null,
+            eventStartDate: null,
+            regularFee: null,
+            submissionUrl: null,  // list endpoint didn't return one
+            website: null,
+            compositeScore: null,
+        );
+
+        $enriched = $this->makeService()->details($input);
+
+        $this->assertSame('https://sitgesfilmfestival.com/submit', $enriched->submissionUrl);
+        $this->assertSame('https://sitgesfilmfestival.com/submit', $enriched->bestUrl());
+    }
+
+    public function test_details_caches_response_for_twenty_four_hours(): void
+    {
+        // Second call must NOT hit the API — we cached on the first.
+        Http::fake([
+            'https://festivalapi.com/v1/festivals/42/' => Http::response([
+                'id' => 42,
+                'name' => 'Sitges',
+                'categories' => ['feature'],
+                'submission_url' => 'https://sitgesfilmfestival.com/submit',
+                'website' => '',
+            ], 200),
+        ]);
+
+        $input = new FestivalData(
+            apiId: 42, name: 'Sitges', categories: [], primaryCategory: null,
+            country: null, city: null, state: null, genres: [],
+            deadline: null, eventStartDate: null, regularFee: null,
+            submissionUrl: null, website: null, compositeScore: null,
+        );
+
+        $this->makeService()->details($input);
+        $this->makeService()->details($input);
+        $this->makeService()->details($input);
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_details_returns_input_unchanged_when_api_call_fails(): void
+    {
+        // If the detail endpoint is down, the card must still render with
+        // the fallback URL (FilmFreeway search by name). We don't lose
+        // the festival — we just lose the upgrade to the real URL.
+        Http::fake([
+            'https://festivalapi.com/v1/festivals/42/' => Http::response(
+                ['detail' => 'Server error'], 500
+            ),
+        ]);
+
+        $input = new FestivalData(
+            apiId: 42, name: 'Sitges', categories: [], primaryCategory: null,
+            country: null, city: null, state: null, genres: [],
+            deadline: null, eventStartDate: null, regularFee: null,
+            submissionUrl: null, website: null, compositeScore: null,
+        );
+
+        $result = $this->makeService()->details($input);
+
+        // Returned the same DTO (same apiId, same name) — bestUrl()
+        // falls back to the FilmFreeway search URL.
+        $this->assertSame(42, $result->apiId);
+        $this->assertSame(
+            'https://filmfreeway.com/search?q=Sitges',
+            $result->bestUrl()
+        );
     }
 }

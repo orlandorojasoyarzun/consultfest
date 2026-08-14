@@ -16,6 +16,14 @@ Route::get('/', function () {
 
 Route::get('/festivals/search', [FestivalController::class, 'search'])->name('festivals.search');
 Route::resource('festivals', FestivalController::class)->only(['index', 'show']);
+// Lazy redirect: when a user clicks a festival card on the list page, we
+// hit this route which triggers the detail enrichment (1 credit, 24h
+// cached per apiId) and 302s to the organizer's real URL. Browsing the
+// list costs only 1 credit (the list call) regardless of how many cards
+// the user scrolls past — we only spend when intent is signaled.
+Route::get('/festivals/{apiId}/redirect', [FestivalController::class, 'redirectToFestival'])
+    ->whereNumber('apiId')
+    ->name('festivals.redirect');
 Route::post('/subscribe', [FestivalController::class, 'subscribe'])
     ->middleware('throttle:subscribe')
     ->name('festivals.subscribe');
