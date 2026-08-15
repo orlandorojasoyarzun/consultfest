@@ -42,16 +42,21 @@
         </div>
         <div class="space-y-2">
             @foreach($festivals as $festival)
-                {{-- Card split into two zones to keep the redirect link and
-                     the subscribe button cleanly separated:
-                       1) <a> wraps the festival info (title, location, dates)
-                          and triggers the lazy redirect to the organizer's URL
-                          (1 FestivalAPI credit, 24h cached).
-                       2) The bottom row (Fee/Abierto + Suscribirme) lives
-                          OUTSIDE the <a> so the button never inherits the
-                          link's navigation. Livewire's wire:click.prevent
-                          stops the browser's default form submission; we
-                          also use .stop to keep the event from bubbling.
+                {{-- Card structure (intentional split):
+                       1) The TITLE is the only thing wrapped in <a>. Cursor
+                          pointer + accent color on hover make it discoverable
+                          as "the click target for the festival detail".
+                          Clicking it triggers the lazy redirect to the
+                          organizer's URL (1 FestivalAPI credit, 24h cached).
+                       2) The rest of the festival info (location, genres,
+                          dates) is pure display — default cursor, no
+                          accidental navigation.
+                       3) The bottom row (Fee/Abierto + Subscribe) is a
+                          sibling of the <a>, never inside it. The Subscribe
+                          button calls openSubscribeModal() directly, which
+                          re-dispatches to FestivalSubscribeModal via
+                          Livewire's targeted ->to() (no #[On] on this side —
+                          that would conflict with wire:click).
                      Without this split, an inner <button> inside an <a>
                      triggers the link navigation in some browsers (the
                      button's "default action" is just click, but the
@@ -59,74 +64,74 @@
                 <div
                     class="cinema-card p-6 hover:border-[var(--border-hover)] group"
                 >
-                    <a
-                        href="{{ route('festivals.redirect', ['apiId' => $festival->apiId]) }}"
-                        class="block"
-                    >
-                        <div class="flex items-start justify-between gap-6">
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-baseline gap-3 mb-2">
-                                    <h3 class="text-lg font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors truncate">
+                    <div class="flex items-start justify-between gap-6">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-baseline gap-3 mb-2">
+                                <h3 class="text-lg font-medium truncate">
+                                    <a
+                                        href="{{ route('festivals.redirect', ['apiId' => $festival->apiId]) }}"
+                                        class="text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                                    >
                                         {{ $festival->name }}
-                                    </h3>
-                                    @if($festival->compositeScore !== null)
-                                        <span class="text-xs font-medium text-[var(--accent)] tabular-nums shrink-0">
-                                            {{ number_format($festival->compositeScore, 1) }}
-                                        </span>
-                                    @endif
-                                </div>
-
-                                <div class="flex items-center gap-3 text-sm text-[var(--text-muted)] flex-wrap">
-                                    @if($festival->country)
-                                        <span class="flex items-center gap-1.5">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                            </svg>
-                                            {{ $festival->city ? "{$festival->city}, " : '' }}{{ $festival->country }}
-                                        </span>
-                                    @endif
-                                    @if($festival->primaryCategory)
-                                        <span class="text-[var(--text-faintest)]">·</span>
-                                        <span>{{ ucfirst(str_replace('_', ' ', $festival->primaryCategory)) }}</span>
-                                    @endif
-                                </div>
-
-                                @if(count($festival->genres) > 0)
-                                    <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-                                        @foreach(array_slice($festival->genres, 0, 4) as $genre)
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-color)]">
-                                                {{ $genre }}
-                                            </span>
-                                        @endforeach
-                                    </div>
+                                    </a>
+                                </h3>
+                                @if($festival->compositeScore !== null)
+                                    <span class="text-xs font-medium text-[var(--accent)] tabular-nums shrink-0">
+                                        {{ number_format($festival->compositeScore, 1) }}
+                                    </span>
                                 @endif
                             </div>
 
-                            <div class="flex flex-col items-end gap-2 shrink-0">
-                                @if($festival->eventStartDate)
-                                    <div class="text-right">
-                                        <div class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Apertura</div>
-                                        <span class="text-sm font-medium text-[var(--success)] tabular-nums">
-                                            {{ $festival->eventStartDate->format('M d, Y') }}
-                                        </span>
-                                    </div>
+                            <div class="flex items-center gap-3 text-sm text-[var(--text-muted)] flex-wrap">
+                                @if($festival->country)
+                                    <span class="flex items-center gap-1.5">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        </svg>
+                                        {{ $festival->city ? "{$festival->city}, " : '' }}{{ $festival->country }}
+                                    </span>
                                 @endif
-                                @if($festival->deadline)
-                                    <div class="text-right">
-                                        <div class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Deadline</div>
-                                        <span class="text-sm font-medium text-[var(--danger)] tabular-nums">
-                                            {{ $festival->deadline->format('M d, Y') }}
-                                        </span>
-                                    </div>
+                                @if($festival->primaryCategory)
+                                    <span class="text-[var(--text-faintest)]">·</span>
+                                    <span>{{ ucfirst(str_replace('_', ' ', $festival->primaryCategory)) }}</span>
                                 @endif
                             </div>
+
+                            @if(count($festival->genres) > 0)
+                                <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                                    @foreach(array_slice($festival->genres, 0, 4) as $genre)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-color)]">
+                                            {{ $genre }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
-                    </a>
 
-                    {{-- Bottom row: sits OUTSIDE the <a>. The Subscribe button
-                         lives here so it never triggers the redirect link.
-                         Fee / Abierto are just informational labels. --}}
+                        <div class="flex flex-col items-end gap-2 shrink-0">
+                            @if($festival->eventStartDate)
+                                <div class="text-right">
+                                    <div class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Apertura</div>
+                                    <span class="text-sm font-medium text-[var(--success)] tabular-nums">
+                                        {{ $festival->eventStartDate->format('M d, Y') }}
+                                    </span>
+                                </div>
+                            @endif
+                            @if($festival->deadline)
+                                <div class="text-right">
+                                    <div class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Deadline</div>
+                                    <span class="text-sm font-medium text-[var(--danger)] tabular-nums">
+                                        {{ $festival->deadline->format('M d, Y') }}
+                                    </span>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Bottom row: fee + accept-status on the left,
+                         Subscribe button on the right. Both fully outside
+                         the <a> so no event leakage. --}}
                     @if($festival->regularFee !== null || $festival->deadline !== null)
                         <div class="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-[var(--border-color)]">
                             <div class="flex items-center gap-4">
@@ -150,26 +155,19 @@
                                 @endif
                             </div>
 
-                            {{-- Subscribe button: opens the modal. Lives
-                                 outside the <a> by construction, but we add
-                                 .stop as belt-and-braces in case any future
-                                 wrapping refactor puts it back inside. --}}
                             <button
                                 type="button"
-                                wire:click.stop="openSubscribeModal({{ $festival->apiId }}, @js($festival->name))"
+                                wire:click="openSubscribeModal({{ $festival->apiId }}, @js($festival->name))"
                                 class="cinema-btn px-3 py-1.5 text-xs shrink-0"
                             >
                                 + Suscribirme
                             </button>
                         </div>
                     @else
-                        {{-- If there's no Fee and no Deadline to display, still
-                             show the Subscribe button so the user can act on
-                             the festival. --}}
                         <div class="flex items-center justify-end mt-4 pt-4 border-t border-[var(--border-color)]">
                             <button
                                 type="button"
-                                wire:click.stop="openSubscribeModal({{ $festival->apiId }}, @js($festival->name))"
+                                wire:click="openSubscribeModal({{ $festival->apiId }}, @js($festival->name))"
                                 class="cinema-btn px-3 py-1.5 text-xs shrink-0"
                             >
                                 + Suscribirme

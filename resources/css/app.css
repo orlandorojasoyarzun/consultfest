@@ -172,6 +172,7 @@ body {
     font-weight: 500;
     border-radius: 0.5rem;
     transition: all 0.15s ease;
+    cursor: pointer;
 }
 
 .cinema-btn:hover {
@@ -189,6 +190,7 @@ body {
     color: var(--text-primary);
     border-radius: 0.5rem;
     transition: all 0.15s ease;
+    cursor: pointer;
 }
 
 .cinema-btn-outline:hover {

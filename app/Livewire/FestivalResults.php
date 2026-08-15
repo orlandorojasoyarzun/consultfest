@@ -6,7 +6,6 @@ use App\Services\FestivalApiService;
 use App\Services\FestivalRateLimitException;
 use App\Services\FestivalSearchService;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 class FestivalResults extends Component
@@ -60,13 +59,18 @@ class FestivalResults extends Component
     private FestivalApiService $apiService;
 
     /**
-     * Re-dispatch the open-subscribe-modal event to the modal component.
-     * The card's `wire:click.stop="openSubscribeModal(...)"` invocation
-     * lands here; we forward it to FestivalSubscribeModal via Livewire's
-     * targeted dispatch (Livewire v3 `->to()` pattern, same as
-     * FestivalCalendar::search uses for `search-festivals`).
+     * Forward an open-subscribe-modal event to FestivalSubscribeModal.
+     * The card's `wire:click="openSubscribeModal(...)"` invocation lands
+     * here; we re-dispatch via Livewire v3's targeted `->to()` pattern
+     * (same as FestivalCalendar::search uses for `search-festivals`).
+     *
+     * Important: this is a regular method, NOT a `#[On(...)]` listener.
+     * If we registered both `wire:click` and `#[On('open-subscribe-modal')`
+     * on the same handler, the listener would re-fire on every dispatch
+     * (including the one we send here), causing either an infinite loop
+     * or a stale event landing in the modal. The actual listener lives
+     * on FestivalSubscribeModal and is the *target* of the dispatch.
      */
-    #[On('open-subscribe-modal')]
     public function openSubscribeModal(int $apiId, string $name): void
     {
         $this->dispatch('open-subscribe-modal', apiId: $apiId, name: $name)
