@@ -61,20 +61,32 @@ class FestivalResults extends Component
     /**
      * Forward an open-subscribe-modal event to FestivalSubscribeModal.
      * The card's `wire:click="openSubscribeModal(...)"` invocation lands
-     * here; we re-dispatch via Livewire v3's targeted `->to()` pattern
-     * (same as FestivalCalendar::search uses for `search-festivals`).
+     * here; we re-dispatch as a global Livewire event so any component on
+     * the page listening for `open-subscribe-modal` receives it (the
+     * modal is the only listener — FestivalResults itself must NOT be).
+     *
+     * Why global (no `->to()`) and not targeted: in Livewire v3, a
+     * targeted `->to('festival-subscribe-modal')` only resolves when the
+     * server response from THIS request includes the target component's
+     * updated snapshot. When the dispatch originates from FestivalResults
+     * and only the Results component is in scope of this request, the
+     * modal's snapshot isn't sent back, so the JS never gets a payload
+     * to update the modal with — the listener fires server-side but the
+     * client never sees the state change. A global dispatch lets the
+     * modal's listener be re-invoked on its own component round-trip.
      *
      * Important: this is a regular method, NOT a `#[On(...)]` listener.
      * If we registered both `wire:click` and `#[On('open-subscribe-modal')`
      * on the same handler, the listener would re-fire on every dispatch
-     * (including the one we send here), causing either an infinite loop
-     * or a stale event landing in the modal. The actual listener lives
-     * on FestivalSubscribeModal and is the *target* of the dispatch.
+     * (including the one we send here), causing an infinite loop. The
+     * actual listener lives only on FestivalSubscribeModal.
      */
     public function openSubscribeModal(int $apiId, string $name): void
     {
-        $this->dispatch('open-subscribe-modal', apiId: $apiId, name: $name)
-            ->to('festival-subscribe-modal');
+        // Global dispatch (no ->to()). Livewire JS will round-trip to
+        // the modal's own endpoint, which has #[On('open-subscribe-modal')]
+        // registered on the `open` method.
+        $this->dispatch('open-subscribe-modal', apiId: $apiId, name: $name);
     }
 
     public function mount()

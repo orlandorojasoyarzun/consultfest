@@ -97,7 +97,8 @@
 
     {{-- Global subscribe modal. Lives on this page because it's the only
          page that has <livewire:festival-results />; the results component
-         dispatches `open-subscribe-modal` to it via targeted dispatch. --}}
+         dispatches `open-subscribe-modal` as a global Livewire event that
+         this modal's #[On('open-subscribe-modal')] listener picks up. --}}
     <livewire:festival-subscribe-modal />
 
     @livewireScripts

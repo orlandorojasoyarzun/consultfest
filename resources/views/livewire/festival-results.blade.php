@@ -53,10 +53,19 @@
                           accidental navigation.
                        3) The bottom row (Fee/Abierto + Subscribe) is a
                           sibling of the <a>, never inside it. The Subscribe
-                          button calls openSubscribeModal() directly, which
-                          re-dispatches to FestivalSubscribeModal via
-                          Livewire's targeted ->to() (no #[On] on this side —
-                          that would conflict with wire:click).
+                          button calls openSubscribeModal() which re-dispatches
+                          `open-subscribe-modal` as a *global* Livewire event
+                          (no ->to()). The FestivalSubscribeModal component
+                          picks it up via its #[On('open-subscribe-modal')]
+                          listener. We deliberately do NOT register #[On] on
+                          FestivalResults itself — doing so would re-fire this
+                          handler on every dispatch and create an infinite
+                          loop. Global dispatch (rather than ->to(target)) is
+                          needed because Livewire v3 only includes the
+                          targeted component's updated snapshot in the
+                          response when that component is already in scope
+                          of the originating request; the modal isn't, so a
+                          targeted dispatch never reaches the client.
                      Without this split, an inner <button> inside an <a>
                      triggers the link navigation in some browsers (the
                      button's "default action" is just click, but the
