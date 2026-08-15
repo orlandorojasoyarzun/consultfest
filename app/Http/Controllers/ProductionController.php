@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Production;
 use App\Models\Subscriber;
 use App\Notifications\ProductionCreatedNotification;
+use App\Services\NotificationService;
 use App\Services\ProductionMatcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,8 +13,10 @@ use Illuminate\View\View;
 
 class ProductionController extends Controller
 {
-    public function __construct(private readonly ProductionMatcher $matcher)
-    {
+    public function __construct(
+        private readonly ProductionMatcher $matcher,
+        private readonly NotificationService $notifications,
+    ) {
     }
 
     public function index(Request $request): RedirectResponse|View
@@ -88,11 +91,13 @@ class ProductionController extends Controller
 
         $production = Production::create($data);
 
-        // Confirmation email — queued. Tells the user the record landed
+        // Confirmation email — synchronous. Tells the user the record landed
         // and points them to the production page so they can keep iterating.
+        // safeNotify() catches mail failures so a Resend outage doesn't
+        // surface as a 500 to the user (the production already landed).
         $subscriber = Subscriber::find($subscriberId);
         if ($subscriber) {
-            $subscriber->notify(new ProductionCreatedNotification($production));
+            $this->notifications->safeNotify($subscriber, new ProductionCreatedNotification($production));
         }
 
         return redirect()->route('productions.show', $production)

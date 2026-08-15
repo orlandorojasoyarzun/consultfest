@@ -4,8 +4,6 @@ namespace App\Notifications;
 
 use App\Models\Festival;
 use App\Models\Subscriber;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -14,10 +12,14 @@ use Illuminate\Notifications\Notification;
  *
  * Goal: confirm the subscription was recorded, remind the user which
  * notification type they chose, and tell them where to manage it.
+ *
+ * Synchronous on purpose: this deploy runs no queue worker, so a queued
+ * notification would land in the `jobs` table and never get sent. When
+ * traffic warrants it, swap in a worker service and re-add
+ * `implements ShouldQueue`.
  */
-class FestivalSubscribedNotification extends Notification implements ShouldQueue
+class FestivalSubscribedNotification extends Notification
 {
-    use Queueable;
 
     public function __construct(
         public Festival $festival,

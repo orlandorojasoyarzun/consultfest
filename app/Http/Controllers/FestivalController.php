@@ -9,11 +9,16 @@ use App\Models\Subscription;
 use App\Notifications\FestivalSubscribedNotification;
 use App\Notifications\FestivalUnsubscribedNotification;
 use App\Services\FestivalSearchService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class FestivalController extends Controller
 {
+    public function __construct(private readonly NotificationService $notifications)
+    {
+    }
+
     /**
      * Browse page. Data is fetched live by the embedded <livewire:festival-results>
      * component via FestivalSearchService — see plan: Estrategia A (no local DB).
@@ -170,11 +175,13 @@ class FestivalController extends Controller
             ]
         );
 
-        // Confirmation email — queued. Tells the user the subscription was
-        // recorded and reminds them which notification type they chose.
+        // Confirmation email — synchronous. Tells the user the subscription
+        // was recorded and reminds them which notification type they chose.
+        // safeNotify() catches mail failures so a Resend outage doesn't
+        // surface as a 500 to the user (the subscription already landed).
         $subscriber = Subscriber::find($subscriberId);
         if ($subscriber) {
-            $subscriber->notify(new FestivalSubscribedNotification(
+            $this->notifications->safeNotify($subscriber, new FestivalSubscribedNotification(
                 $festival,
                 $request->notification_type,
             ));
@@ -204,7 +211,7 @@ class FestivalController extends Controller
             if ($deleted > 0) {
                 $subscriber = Subscriber::find($subscriberId);
                 if ($subscriber) {
-                    $subscriber->notify(new FestivalUnsubscribedNotification($festival));
+                    $this->notifications->safeNotify($subscriber, new FestivalUnsubscribedNotification($festival));
                 }
             }
         }
