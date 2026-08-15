@@ -7,6 +7,7 @@ use App\Models\Subscriber;
 use App\Models\Subscription;
 use App\Notifications\FestivalDeadlineNotification;
 use App\Notifications\FestivalOpeningNotification;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -36,8 +37,7 @@ class NotificationService
                     continue;
                 }
 
-                try {
-                    $subscriber->notify(new FestivalDeadlineNotification($festival, $daysAhead));
+                if ($this->safeNotify($subscriber, new FestivalDeadlineNotification($festival, $daysAhead))) {
                     // Direct attribute write: notified_* is in $guarded on Subscription,
                     // so update([...]) would be silently rejected. The system is the
                     // only legitimate writer of these flags.
@@ -47,12 +47,6 @@ class NotificationService
                         'subscriber_id' => $subscriber->id,
                         'festival_id' => $festival->id,
                         'type' => 'deadline',
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('Failed to send deadline notification', [
-                        'subscriber_id' => $subscriber->id,
-                        'festival_id' => $festival->id,
-                        'error' => $e->getMessage(),
                     ]);
                 }
             }
@@ -85,8 +79,7 @@ class NotificationService
                     continue;
                 }
 
-                try {
-                    $subscriber->notify(new FestivalOpeningNotification($festival, $daysAhead));
+                if ($this->safeNotify($subscriber, new FestivalOpeningNotification($festival, $daysAhead))) {
                     // See note in checkAndNotifyDeadline: notified_* is $guarded.
                     $subscription->notified_opening = true;
                     $subscription->save();
@@ -94,12 +87,6 @@ class NotificationService
                         'subscriber_id' => $subscriber->id,
                         'festival_id' => $festival->id,
                         'type' => 'opening',
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('Failed to send opening notification', [
-                        'subscriber_id' => $subscriber->id,
-                        'festival_id' => $festival->id,
-                        'error' => $e->getMessage(),
                     ]);
                 }
             }
@@ -122,5 +109,39 @@ class NotificationService
             })
             ->with('subscriber')
             ->get();
+    }
+
+    /**
+     * Send a notification resilient to mail-driver failures.
+     *
+     * Returns true on success, false on failure. Failure is logged at
+     * `error` level (visible in `LOG_CHANNEL=stderr` on Railway) so a
+     * transient Resend outage doesn't take down the user action.
+     *
+     * Also logs a successful send at `info` level — the only paper trail
+     * for "what did we actually send and to whom". Production staff can
+     * `railway logs | grep "Notification sent"` to audit.
+     */
+    public function safeNotify(Subscriber $subscriber, Notification $notification): bool
+    {
+        $class = $notification::class;
+
+        try {
+            $subscriber->notify($notification);
+            Log::info('Notification sent', [
+                'notification' => $class,
+                'subscriber_id' => $subscriber->id,
+                'subscriber_email' => $subscriber->email,
+            ]);
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Failed to send notification', [
+                'notification' => $class,
+                'subscriber_id' => $subscriber->id,
+                'subscriber_email' => $subscriber->email,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
     }
 }
