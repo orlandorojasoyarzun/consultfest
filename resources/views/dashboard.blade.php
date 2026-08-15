@@ -128,7 +128,7 @@
                 @if($subscriptions->isEmpty())
                     <div class="text-center py-10 border border-dashed border-[var(--border-color)] rounded-lg">
                         <p class="text-sm text-[var(--text-muted)] mb-5">No estás suscrito a ningún festival todavía.</p>
-                        <a href="#explorar-festivales" class="cinema-btn inline-block px-5 py-2 text-sm">Explorar festivales</a>
+                        <a href="{{ route('festivals.index') }}" class="cinema-btn inline-block px-5 py-2 text-sm">Explorar festivales</a>
                     </div>
                 @else
                     <ul class="space-y-2">
@@ -145,38 +145,6 @@
                     </ul>
                 @endif
             </section>
-        </div>
-
-        {{-- Explorador de festivales: solo visible para usuarios autenticados --}}
-        <div id="explorar-festivales" class="border-t border-[var(--border-color)] pt-12">
-            <div class="mb-6">
-                <h2 class="text-xl font-semibold tracking-tight mb-1">Explorar festivales</h2>
-                <p class="text-sm text-[var(--text-muted)]">Filtra por fecha de apertura o deadline para encontrar los festivales que te interesan.</p>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <aside class="lg:col-span-4 space-y-6">
-                    <div class="cinema-card p-7">
-                        <div class="flex items-center justify-between mb-6">
-                            <h3 class="text-sm font-semibold tracking-wide uppercase text-[var(--text-muted)]">Filtros</h3>
-                            <svg class="w-4 h-4 text-[var(--text-faintest)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-                            </svg>
-                        </div>
-                        @livewire('festival-calendar')
-                    </div>
-                </aside>
-
-                <section class="lg:col-span-8">
-                    <div class="flex items-baseline justify-between mb-6">
-                        <h3 class="text-sm font-semibold tracking-wide uppercase text-[var(--text-muted)]">Resultados</h3>
-                    </div>
-
-                    <div id="festival-results">
-                        @livewire('festival-results')
-                    </div>
-                </section>
-            </div>
         </div>
     </main>
 
