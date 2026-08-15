@@ -62,6 +62,14 @@ class FestivalControllerTest extends TestCase
     {
         Notification::fake();
 
+        // The controller now tries FestivalAPI when the festival isn't in
+        // our local DB. We fake the detail call returning 404 so the
+        // test is hermetic (no real network round-trip) and the
+        // controller reliably returns 404.
+        \Illuminate\Support\Facades\Http::fake([
+            'festivalapi.com/*' => \Illuminate\Support\Facades\Http::response('', 404),
+        ]);
+
         $subscriber = Subscriber::factory()->create();
         session(['subscriber_id' => $subscriber->id]);
 
@@ -71,6 +79,83 @@ class FestivalControllerTest extends TestCase
         ]);
 
         $response->assertStatus(404);
+        Notification::assertNothingSent();
+    }
+
+    public function test_subscribe_syncs_festival_from_api_when_not_in_local_db(): void
+    {
+        Notification::fake();
+
+        // FestivalAPI returns a real-looking payload. The controller must
+        // persist it locally, create the subscription row, and fire the
+        // confirmation notification — all without us pre-creating a
+        // Festival row.
+        \Illuminate\Support\Facades\Http::fake([
+            'festivalapi.com/*' => \Illuminate\Support\Facades\Http::response([
+                'id' => 12345,
+                'name' => 'Almería Western Film Festival',
+                'category' => 'short',
+                'country' => 'Spain',
+                'city' => 'Almería',
+                'deadline' => '2026-09-15',
+                'opening_date' => '2026-10-15',
+                'submission_fee' => 25.0,
+                'submission_url' => 'https://filmfreeway.com/Almeria',
+                'website' => 'https://almeriawestern.com',
+            ], 200),
+        ]);
+
+        $subscriber = Subscriber::factory()->create();
+        session(['subscriber_id' => $subscriber->id]);
+
+        $this->assertDatabaseMissing('festivals', ['api_id' => 12345]);
+
+        $response = $this->postJson(route('festivals.subscribe'), [
+            'festival_api_id' => 12345,
+            'notification_type' => 'both',
+        ]);
+
+        $response->assertOk()->assertJson(['success' => true]);
+
+        // Festival was synced into the local DB.
+        $festival = Festival::where('api_id', 12345)->first();
+        $this->assertNotNull($festival);
+        $this->assertSame('Almería Western Film Festival', $festival->name);
+        $this->assertSame('Spain', $festival->country);
+
+        // Subscription row was created against the newly-synced festival.
+        $this->assertDatabaseHas('subscriptions', [
+            'subscriber_id' => $subscriber->id,
+            'festival_id' => $festival->id,
+            'notification_type' => 'both',
+        ]);
+
+        Notification::assertSentTo($subscriber, FestivalSubscribedNotification::class);
+    }
+
+    public function test_subscribe_returns_404_when_festival_not_in_local_db_or_api(): void
+    {
+        Notification::fake();
+
+        // FestivalAPI says the festival doesn't exist (404). The
+        // controller must return 404 without creating anything.
+        \Illuminate\Support\Facades\Http::fake([
+            'festivalapi.com/*' => \Illuminate\Support\Facades\Http::response('', 404),
+        ]);
+
+        $subscriber = Subscriber::factory()->create();
+        session(['subscriber_id' => $subscriber->id]);
+
+        $this->assertDatabaseMissing('festivals', ['api_id' => 99999999]);
+
+        $response = $this->postJson(route('festivals.subscribe'), [
+            'festival_api_id' => 99999999,
+            'notification_type' => 'both',
+        ]);
+
+        $response->assertStatus(404);
+        $this->assertDatabaseMissing('festivals', ['api_id' => 99999999]);
+        $this->assertDatabaseMissing('subscriptions', ['subscriber_id' => $subscriber->id]);
         Notification::assertNothingSent();
     }
 
@@ -138,6 +223,22 @@ class FestivalControllerTest extends TestCase
         $response = $this->deleteJson(route('festivals.unsubscribe', ['festivalApiId' => 1]));
 
         $response->assertStatus(401);
+        Notification::assertNothingSent();
+    }
+
+    public function test_unsubscribe_returns_success_idempotent_when_festival_not_in_local_db(): void
+    {
+        Notification::fake();
+
+        // User might click unsubscribe on a festival they remember
+        // subscribing to but that was never synced. Endpoint must
+        // return success (idempotent) without sending an email.
+        $subscriber = Subscriber::factory()->create();
+        session(['subscriber_id' => $subscriber->id]);
+
+        $response = $this->deleteJson(route('festivals.unsubscribe', ['festivalApiId' => 88888]));
+
+        $response->assertOk()->assertJson(['success' => true]);
         Notification::assertNothingSent();
     }
 

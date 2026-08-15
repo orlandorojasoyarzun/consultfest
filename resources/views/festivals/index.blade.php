@@ -95,6 +95,11 @@
         </div>
     </main>
 
+    {{-- Global subscribe modal. Lives on this page because it's the only
+         page that has <livewire:festival-results />; the results component
+         dispatches `open-subscribe-modal` to it via targeted dispatch. --}}
+    <livewire:festival-subscribe-modal />
+
     @livewireScripts
 </body>
 </html>
