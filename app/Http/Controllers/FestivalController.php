@@ -8,6 +8,7 @@ use App\Models\Subscriber;
 use App\Models\Subscription;
 use App\Notifications\FestivalSubscribedNotification;
 use App\Notifications\FestivalUnsubscribedNotification;
+use App\Services\FestivalApiService;
 use App\Services\FestivalSearchService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -159,10 +160,19 @@ class FestivalController extends Controller
 
         $festival = Festival::where('api_id', $request->festival_api_id)->first();
 
+        // Sync on-demand: if the festival is in FestivalAPI but not yet in
+        // our local DB (the normal case after migrate:fresh), fetch its
+        // detail payload, persist it, and continue. Costs 1 FestivalAPI
+        // credit per new festival. For 1 user this is fine; for scale, batch.
         if (!$festival) {
-            return response()->json([
-                'error' => 'Festival not found. Sync the catalogue first.',
-            ], 404);
+            $synced = app(FestivalApiService::class)->syncFestivalDetails($request->festival_api_id);
+            if (!$synced) {
+                return response()->json(['error' => 'Festival not found in FestivalAPI'], 404);
+            }
+            $festival = Festival::where('api_id', $request->festival_api_id)->first();
+            if (!$festival) {
+                return response()->json(['error' => 'Festival not found after sync'], 500);
+            }
         }
 
         Subscription::updateOrCreate(
@@ -200,19 +210,23 @@ class FestivalController extends Controller
 
         $festival = Festival::where('api_id', $festivalApiId)->first();
 
-        if ($festival) {
-            // Only send confirmation email if there WAS a subscription to
-            // remove. Idempotent endpoint shouldn't spam users when they
-            // hit unsubscribe for a festival they never subscribed to.
-            $deleted = Subscription::where('subscriber_id', $subscriberId)
-                ->where('festival_id', $festival->id)
-                ->delete();
+        // If the festival isn't in our local DB, the user can't possibly be
+        // subscribed to it. Return success idempotently — no email, no error.
+        if (!$festival) {
+            return response()->json(['success' => true]);
+        }
 
-            if ($deleted > 0) {
-                $subscriber = Subscriber::find($subscriberId);
-                if ($subscriber) {
-                    $this->notifications->safeNotify($subscriber, new FestivalUnsubscribedNotification($festival));
-                }
+        // Only send confirmation email if there WAS a subscription to
+        // remove. Idempotent endpoint shouldn't spam users when they
+        // hit unsubscribe for a festival they never subscribed to.
+        $deleted = Subscription::where('subscriber_id', $subscriberId)
+            ->where('festival_id', $festival->id)
+            ->delete();
+
+        if ($deleted > 0) {
+            $subscriber = Subscriber::find($subscriberId);
+            if ($subscriber) {
+                $this->notifications->safeNotify($subscriber, new FestivalUnsubscribedNotification($festival));
             }
         }
 

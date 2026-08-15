@@ -6,6 +6,7 @@ use App\Services\FestivalApiService;
 use App\Services\FestivalRateLimitException;
 use App\Services\FestivalSearchService;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class FestivalResults extends Component
@@ -57,6 +58,20 @@ class FestivalResults extends Component
 
     private FestivalSearchService $searchService;
     private FestivalApiService $apiService;
+
+    /**
+     * Re-dispatch the open-subscribe-modal event to the modal component.
+     * The card's `wire:click.stop="openSubscribeModal(...)"` invocation
+     * lands here; we forward it to FestivalSubscribeModal via Livewire's
+     * targeted dispatch (Livewire v3 `->to()` pattern, same as
+     * FestivalCalendar::search uses for `search-festivals`).
+     */
+    #[On('open-subscribe-modal')]
+    public function openSubscribeModal(int $apiId, string $name): void
+    {
+        $this->dispatch('open-subscribe-modal', apiId: $apiId, name: $name)
+            ->to('festival-subscribe-modal');
+    }
 
     public function mount()
     {

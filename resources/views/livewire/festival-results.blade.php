@@ -48,11 +48,26 @@
                      Browsing the list itself stays at 1 credit (list call)
                      regardless of pagination — we only spend when the user
                      signals intent by clicking. --}}
-                <a
-                    href="{{ route('festivals.redirect', ['apiId' => $festival->apiId]) }}"
-                    class="block cinema-card p-6 hover:border-[var(--border-hover)] group"
+                <div
+                    class="relative cinema-card p-6 hover:border-[var(--border-hover)] group"
                 >
-                    <div class="flex items-start justify-between gap-6">
+                    {{-- Suscribirme button sits absolutely on top of the card.
+                         It calls the modal via Livewire's targeted dispatch
+                         pattern; wire:click.stop prevents the click from
+                         propagating to the underlying <a>. --}}
+                    <button
+                        type="button"
+                        wire:click.stop="openSubscribeModal({{ $festival->apiId }}, @js($festival->name))"
+                        class="absolute top-4 right-4 cinema-btn px-3 py-1.5 text-xs z-10"
+                    >
+                        + Suscribirme
+                    </button>
+
+                    <a
+                        href="{{ route('festivals.redirect', ['apiId' => $festival->apiId]) }}"
+                        class="block"
+                    >
+                    <div class="flex items-start justify-between gap-6 pr-28">
                         <div class="flex-1 min-w-0">
                             <div class="flex items-baseline gap-3 mb-2">
                                 <h3 class="text-lg font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors truncate">
@@ -134,7 +149,8 @@
                             @endif
                         </div>
                     @endif
-                </a>
+                    </a>
+                </div>
             @endforeach
         </div>
 
