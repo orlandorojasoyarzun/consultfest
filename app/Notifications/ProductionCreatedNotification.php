@@ -4,8 +4,6 @@ namespace App\Notifications;
 
 use App\Models\Production;
 use App\Models\Subscriber;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -15,10 +13,15 @@ use Illuminate\Notifications\Notification;
  * Goal: confirm the record landed, surface a deep link to the production,
  * and nudge the user toward subscribing to matching festivals. Kept short
  * so it doesn't compete with the dashboard UX.
+ *
+ * Synchronous on purpose: this deploy runs no queue worker, so a queued
+ * notification would land in the `jobs` table and never get sent. For a
+ * demo of 1–2 users the sync path is fine — it adds ~1–2s to the
+ * production creation request (SMTP round-trip to Resend). When traffic
+ * warrants it, swap in a worker service and re-add `implements ShouldQueue`.
  */
-class ProductionCreatedNotification extends Notification implements ShouldQueue
+class ProductionCreatedNotification extends Notification
 {
-    use Queueable;
 
     public function __construct(
         public Production $production,

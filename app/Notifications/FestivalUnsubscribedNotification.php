@@ -4,8 +4,6 @@ namespace App\Notifications;
 
 use App\Models\Festival;
 use App\Models\Subscriber;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -15,10 +13,14 @@ use Illuminate\Notifications\Notification;
  * Goal: confirm the desubscription landed so the user isn't left wondering
  * whether they'll still get emails. Also nudges them back to the catalogue
  * in case they want to subscribe to other festivals.
+ *
+ * Synchronous on purpose: this deploy runs no queue worker, so a queued
+ * notification would land in the `jobs` table and never get sent. When
+ * traffic warrants it, swap in a worker service and re-add
+ * `implements ShouldQueue`.
  */
-class FestivalUnsubscribedNotification extends Notification implements ShouldQueue
+class FestivalUnsubscribedNotification extends Notification
 {
-    use Queueable;
 
     public function __construct(
         public Festival $festival,

@@ -3,14 +3,21 @@
 namespace App\Notifications;
 
 use App\Models\Festival;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class FestivalOpeningNotification extends Notification implements ShouldQueue
+/**
+ * Cron-driven "submissions open" reminder. Dispatched by
+ * NotificationService::checkAndNotifyOpening() when a festival's
+ * opening_date is N days ahead and at least one subscriber is watching.
+ *
+ * Synchronous on purpose: this deploy runs no queue worker, so a queued
+ * notification would land in the `jobs` table and never get sent. When
+ * traffic warrants it, swap in a worker service and re-add
+ * `implements ShouldQueue`.
+ */
+class FestivalOpeningNotification extends Notification
 {
-    use Queueable;
 
     public function __construct(
         public Festival $festival,
