@@ -137,7 +137,7 @@
 
                             <button
                                 type="button"
-                                wire:click="openSubscribeModal({{ $festival->apiId }}, @js($festival->name))"
+                                wire:click="openSubscribeModal({{ $festival->apiId }})"
                                 class="cinema-btn px-3 py-1.5 text-xs shrink-0"
                             >
                                 + Suscribirme
@@ -147,7 +147,7 @@
                         <div class="flex items-center justify-end mt-4 pt-4 border-t border-[var(--border-color)]">
                             <button
                                 type="button"
-                                wire:click="openSubscribeModal({{ $festival->apiId }}, @js($festival->name))"
+                                wire:click="openSubscribeModal({{ $festival->apiId }})"
                                 class="cinema-btn px-3 py-1.5 text-xs shrink-0"
                             >
                                 + Suscribirme

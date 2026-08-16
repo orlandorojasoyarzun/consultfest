@@ -74,6 +74,17 @@ class FestivalResults extends Component
     public bool $subscribeEmailConfirmed = false;
     public bool $subscribeSubscriberLoggedIn = false;
 
+    /**
+     * Map of apiId → festival name for the festivals currently visible
+     * on the page. Used by openSubscribeModal() to show the modal title
+     * immediately without needing a second server round-trip. We don't
+     * pass the name through wire:click because @js() triggers a CSP
+     * unsafe-eval error under `script-src 'self'`.
+     *
+     * @var array<int, string>
+     */
+    public array $festivalNames = [];
+
     protected $listeners = [
         'search-festivals' => 'search',
     ];
@@ -129,13 +140,23 @@ class FestivalResults extends Component
 
     /**
      * Open the modal and fetch the festival preview. Called from the
-     * `+ Suscribirme` button via `wire:click="openSubscribeModal(...)"`.
+     * `+ Suscribirme` button via `wire:click="openSubscribeModal({{ apiId }})"`.
+     *
+     * IMPORTANT: we pass only the integer apiId — NOT the festival name.
+     * Passing the name would require `@js($festival->name)` in the blade,
+     * which Livewire then evals as JavaScript. With CSP `script-src 'self'`
+     * (no `unsafe-eval`), that eval throws and the wire:click never reaches
+     * the server. Looking up the name from the in-memory search results
+     * here keeps the button click safe under strict CSP.
      */
-    public function openSubscribeModal(int $apiId, string $name): void
+    public function openSubscribeModal(int $apiId): void
     {
         $this->resetSubscribeState();
         $this->subscribeFestivalApiId = $apiId;
-        $this->subscribeFestivalName = $name;
+        // Try to grab the name from the current page's results so the modal
+        // shows it instantly. If the user paginated and the festival isn't
+        // on screen, the sync below will populate it.
+        $this->subscribeFestivalName = $this->festivalNames[$apiId] ?? '';
         $this->subscribeModalOpen = true;
         $this->subscribeLoading = true;
         $this->subscriberEmail = session('subscriber_email');
@@ -238,6 +259,7 @@ class FestivalResults extends Component
             $totalPages = 1;
             $items = collect();
             $this->page = 1;
+            $this->festivalNames = [];
             return view('livewire.festival-results', [
                 'totalCount' => 0,
                 'festivals' => $items,
@@ -261,6 +283,14 @@ class FestivalResults extends Component
         $items = $results->slice(($this->page - 1) * $perPage, $perPage)
             ->values();
 
+        // Snapshot the visible page's apiId → name so openSubscribeModal
+        // can fill $subscribeFestivalName without a second round-trip and
+        // without passing the name through @js() (CSP unsafe-eval kills that).
+        $this->festivalNames = [];
+        foreach ($items as $f) {
+            $this->festivalNames[$f->apiId] = $f->name;
+        }
+
         return view('livewire.festival-results', [
             'totalCount' => $results->count(),
             'festivals' => $items,
@@ -279,6 +309,10 @@ class FestivalResults extends Component
 
     private function hydrateSubscribeFromModel(Festival $festival): void
     {
+        // Authoritative source: the synced Festival row. This handles the
+        // case where the user opened the modal for a festival that's NOT on
+        // the currently visible page (so festivalNames has no entry).
+        $this->subscribeFestivalName = $festival->name ?? '';
         $this->subscribeCountry = $festival->country ?? '';
         $details = $festival->details ?? [];
         $this->subscribeCity = is_string($details['city'] ?? null) ? $details['city'] : '';

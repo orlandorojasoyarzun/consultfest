@@ -83,7 +83,7 @@ class FestivalSubscribeModalDispatchTest extends TestCase
         ]);
 
         Livewire::test(FestivalResults::class)
-            ->call('openSubscribeModal', 12345, 'Mar del Plata Fest')
+            ->call('openSubscribeModal', 12345)
             ->assertSet('subscribeModalOpen', true)
             ->assertSet('subscribeFestivalApiId', 12345)
             ->assertSet('subscribeFestivalName', 'Mar del Plata Fest')
@@ -104,7 +104,7 @@ class FestivalSubscribeModalDispatchTest extends TestCase
         ]);
 
         $results = Livewire::test(FestivalResults::class);
-        $results->call('openSubscribeModal', 99, 'Festival X');
+        $results->call('openSubscribeModal', 99);
 
         $dispatches = $results->effects['dispatches'] ?? [];
         $matching = collect($dispatches)->firstWhere('name', 'open-subscribe-modal');
@@ -138,6 +138,40 @@ class FestivalSubscribeModalDispatchTest extends TestCase
         }
     }
 
+    public function test_openSubscribeModal_signature_only_takes_int(): void
+    {
+        // 4. CSP regression guard. The Subscribe button uses
+        //    `wire:click="openSubscribeModal({{ $festival->apiId }})"` —
+        //    an integer only. A previous version passed the festival name
+        //    as a second argument via `@js($festival->name)`, which made
+        //    Livewire eval the full expression as JavaScript. Production
+        //    has `Content-Security-Policy: script-src 'self'` (no
+        //    unsafe-eval), so that eval threw EvalError and the click
+        //    never reached the server. Locking the signature to a single
+        //    int here keeps the wire:click safe under strict CSP — adding
+        //    a string parameter forces a reviewer to also relax CSP or
+        //    rework the call site, both of which are visible in this PR.
+        $reflection = new \ReflectionClass(FestivalResults::class);
+        $method = $reflection->getMethod('openSubscribeModal');
+        $params = $method->getParameters();
+
+        $this->assertCount(
+            1,
+            $params,
+            'FestivalResults::openSubscribeModal must take exactly one parameter (the apiId). Adding a string would re-trigger the CSP unsafe-eval bug.'
+        );
+        $this->assertSame(
+            'apiId',
+            $params[0]->getName(),
+            'The single parameter must be named apiId for clarity.'
+        );
+        $this->assertSame(
+            'int',
+            (string) $params[0]->getType(),
+            'The apiId parameter must be typed as int — Livewire serializes it as a JSON number, no JS eval needed.'
+        );
+    }
+
     public function test_confirm_subscribe_requires_email_confirmation(): void
     {
         // 4. The Confirm button must NOT post to /subscribe until the user
@@ -167,7 +201,7 @@ class FestivalSubscribeModalDispatchTest extends TestCase
         $this->withSession(['subscriber_id' => $subscriber->id, 'subscriber_email' => 'cine@filmmaker.test']);
 
         Livewire::test(FestivalResults::class)
-            ->call('openSubscribeModal', 12345, 'Mar del Plata Fest')
+            ->call('openSubscribeModal', 12345)
             ->assertSet('subscribeSubscriberLoggedIn', true)
             ->assertSet('subscriberEmail', 'cine@filmmaker.test')
             ->assertSet('subscribeEmailConfirmed', false)
