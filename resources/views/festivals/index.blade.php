@@ -97,8 +97,9 @@
 
     {{-- Global subscribe modal. Lives on this page because it's the only
          page that has <livewire:festival-results />; the results component
-         dispatches `open-subscribe-modal` as a global Livewire event that
-         this modal's #[On('open-subscribe-modal')] listener picks up. --}}
+         dispatches `open-subscribe-modal` targeted at FestivalSubscribeModal
+         via `->to(FQCN::class)`, the same pattern FestivalCalendar uses to
+         reach FestivalResults. --}}
     <livewire:festival-subscribe-modal />
 
     @livewireScripts
