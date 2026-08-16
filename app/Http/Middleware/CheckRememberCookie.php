@@ -47,7 +47,15 @@ class CheckRememberCookie
         foreach ($subscriberIds as $id) {
             $expected = hash_hmac('sha256', (string) $id, $appKey);
             if (hash_equals($expected, (string) $cookie)) {
-                session(['subscriber_id' => (int) $id]);
+                // Fetch the email here so the subscribe modal can read it
+                // from the session on the next request — without this, a
+                // user restored from the remember cookie would see
+                // "Necesitás tener una cuenta" even though they're logged in.
+                $subscriber = Subscriber::find($id);
+                session([
+                    'subscriber_id' => (int) $id,
+                    'subscriber_email' => $subscriber?->email,
+                ]);
                 break;
             }
         }

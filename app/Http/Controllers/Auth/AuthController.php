@@ -71,7 +71,16 @@ class AuthController extends Controller
         }
 
         session()->regenerate(); // prevent session fixation
-        session(['subscriber_id' => $subscriber->id]);
+        session([
+            'subscriber_id' => $subscriber->id,
+            // The subscribe modal reads `subscriber_email` from the session
+            // to pre-fill the "we'll notify you at…" block AND to flip the
+            // $subscribeSubscriberLoggedIn flag. Without this key, an
+            // authenticated user still sees "Necesitás tener una cuenta"
+            // because the modal's `if loggedIn && email` guard fails on
+            // null. Setting both keeps the Livewire component in sync.
+            'subscriber_email' => $subscriber->email,
+        ]);
 
         $response = redirect()->route('dashboard')
             ->with('auth-flash', 'Bienvenido, '.$subscriber->name.'.');
@@ -124,7 +133,12 @@ class AuthController extends Controller
         $subscriber->notify(new WelcomeNotification($subscriber));
 
         session()->regenerate();
-        session(['subscriber_id' => $subscriber->id]);
+        session([
+            'subscriber_id' => $subscriber->id,
+            // See login() — same reason: the modal needs subscriber_email
+            // to flip its "logged in" branch.
+            'subscriber_email' => $subscriber->email,
+        ]);
 
         return redirect()->route('dashboard')
             ->with('auth-flash', 'Cuenta creada. Bienvenido, '.$subscriber->name.'.');
