@@ -218,29 +218,29 @@
         </div>
     @endif
 
-    @if($subscribeModalOpen)
+    {{-- The modal lives in the DOM permanently. Visibility is toggled by
+         the Livewire.hook attached at the bottom of this file: on every
+         `morph.updated` it reads subscribeModalOpen from the snapshot and
+         calls showModal()/close() on the native <dialog>. Using the
+         snapshot as the source of truth keeps the modal in sync with
+         actual server state — earlier approaches that flipped a `hidden`
+         class from a click handler were undone by morphdom reapplying
+         `hidden` on the next request. --}}
+    <dialog
+        id="subscribe-modal"
+        class="bg-transparent p-0"
+        style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
+        wire:click.self="closeSubscribeModal"
+    >
+        <style>[open]#subscribe-modal{background:transparent;border:0;box-shadow:none;outline:0;padding:0;color-scheme:dark}[open]#subscribe-modal::backdrop{background-color:rgba(0,0,0,.6);backdrop-filter:blur(4px)}</style>
         <div
-            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            wire:click.self="closeSubscribeModal"
+            class="cinema-card w-full max-h-[90vh] overflow-y-auto p-7 relative"
+            style="border-radius: 0.75rem;"
+            wire:click.stop
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="subscribe-modal-title"
         >
-            <div
-                class="cinema-card w-full max-w-lg max-h-[90vh] overflow-y-auto p-7 relative"
-                wire:click.stop
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="subscribe-modal-title"
-            >
-                <button
-                    type="button"
-                    wire:click="closeSubscribeModal"
-                    class="absolute top-4 right-4 text-[var(--text-faintest)] hover:text-[var(--text-secondary)] transition-colors"
-                    aria-label="Cerrar"
-                >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-
                 @if($subscribeLoading && !$subscribeFestivalApiId)
                     <div class="flex flex-col items-center justify-center py-12 gap-3">
                         <svg class="animate-spin h-6 w-6 text-[var(--accent)]" fill="none" viewBox="0 0 24 24">
@@ -285,53 +285,62 @@
                         @endif
                     </div>
 
-                    <dl class="grid grid-cols-2 gap-4 mb-6 p-5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)]">
-                        @if($subscribePrimaryCategory)
-                            <div>
-                                <dt class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Categoría</dt>
-                                <dd class="text-sm text-[var(--text-primary)]">{{ ucfirst(str_replace('_', ' ', $subscribePrimaryCategory)) }}</dd>
-                            </div>
-                        @endif
-                        @if($subscribeDeadline)
-                            <div>
-                                <dt class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Deadline</dt>
-                                <dd class="text-sm font-medium text-[var(--danger)] tabular-nums">{{ $subscribeDeadline }}</dd>
-                            </div>
-                        @endif
-                        @if($subscribeOpeningDate)
-                            <div>
-                                <dt class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Apertura</dt>
-                                <dd class="text-sm font-medium text-[var(--success)] tabular-nums">{{ $subscribeOpeningDate }}</dd>
-                            </div>
-                        @endif
-                        @if($subscribeRegularFee)
-                            <div>
-                                <dt class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Submission fee</dt>
-                                <dd class="text-sm font-medium text-[var(--text-primary)] tabular-nums">{{ $subscribeRegularFee }}</dd>
-                            </div>
-                        @endif
-                    </dl>
+                    @if($subscribePrimaryCategory || $subscribeDeadline || $subscribeOpeningDate || $subscribeRegularFee)
+                        <dl class="grid grid-cols-2 gap-4 mb-6 p-5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)]">
+                            @if($subscribePrimaryCategory)
+                                <div>
+                                    <dt class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Categoría</dt>
+                                    <dd class="text-sm text-[var(--text-primary)]">{{ ucfirst(str_replace('_', ' ', $subscribePrimaryCategory)) }}</dd>
+                                </div>
+                            @endif
+                            @if($subscribeDeadline)
+                                <div>
+                                    <dt class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Deadline</dt>
+                                    <dd class="text-sm font-medium text-[var(--danger)] tabular-nums">{{ $subscribeDeadline }}</dd>
+                                </div>
+                            @endif
+                            @if($subscribeOpeningDate)
+                                <div>
+                                    <dt class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Apertura</dt>
+                                    <dd class="text-sm font-medium text-[var(--success)] tabular-nums">{{ $subscribeOpeningDate }}</dd>
+                                </div>
+                            @endif
+                            @if($subscribeRegularFee)
+                                <div>
+                                    <dt class="text-[10px] text-[var(--text-faintest)] uppercase tracking-wider font-medium mb-1">Submission fee</dt>
+                                    <dd class="text-sm font-medium text-[var(--text-primary)] tabular-nums">{{ $subscribeRegularFee }}</dd>
+                                </div>
+                            @endif
+                        </dl>
+                    @endif
 
-                    @if($subscribeSubmissionUrl || $subscribeWebsite)
-                        <div class="flex flex-wrap items-center gap-3 mb-6 text-xs">
-                            @if($subscribeSubmissionUrl)
-                                <a href="{{ $subscribeSubmissionUrl }}" target="_blank" rel="noopener noreferrer"
-                                   class="inline-flex items-center gap-1.5 text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors">
-                                    Sitio del festival
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    @php
+                        // Deduplicate: many festivals expose submission_url and website
+                        // pointing at the same page (e.g. festival's own site IS the
+                        // submission form). Render one block per unique URL; if both
+                        // URLs resolve to the same destination, we show a single
+                        // "Sitio del festival" entry instead of two near-duplicates.
+                        $subscribeLinks = collect([
+                            $subscribeSubmissionUrl ? ['label' => 'Sitio del festival', 'url' => $subscribeSubmissionUrl] : null,
+                            $subscribeWebsite && (!$subscribeSubmissionUrl || $subscribeWebsite !== $subscribeSubmissionUrl)
+                                ? ['label' => 'Web', 'url' => $subscribeWebsite]
+                                : null,
+                        ])->filter()->values();
+                    @endphp
+                    @if($subscribeLinks->isNotEmpty())
+                        <div class="space-y-2 mb-6">
+                            @foreach($subscribeLinks as $link)
+                                <a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer"
+                                   class="flex items-center gap-3 px-4 py-3 rounded-lg border border-[var(--border-color)] hover:border-[var(--border-hover)] bg-[var(--bg-secondary)] transition-colors group">
+                                    <svg class="w-4 h-4 text-[var(--text-muted)] shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/>
+                                    </svg>
+                                    <span class="text-sm font-medium text-[var(--text-primary)] flex-1 min-w-0 truncate">{{ $link['label'] }}</span>
+                                    <svg class="w-3.5 h-3.5 text-[var(--text-faintest)] group-hover:text-[var(--accent)] transition-colors shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
                                     </svg>
                                 </a>
-                            @endif
-                            @if($subscribeWebsite)
-                                <a href="{{ $subscribeWebsite }}" target="_blank" rel="noopener noreferrer"
-                                   class="inline-flex items-center gap-1.5 text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors">
-                                    Web
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
-                                    </svg>
-                                </a>
-                            @endif
+                            @endforeach
                         </div>
                     @endif
 
@@ -423,17 +432,40 @@
                             class="cinema-btn px-5 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <span wire:loading.remove wire:target="confirmSubscribe">Confirmar suscripción</span>
-                            <span wire:loading wire:target="confirmSubscribe" class="inline-flex items-center gap-2">
-                                <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                            <span wire:loading wire:target="confirmSubscribe" class="inline-flex items-center justify-center gap-2">
+                                <svg class="animate-spin h-3.5 w-3.5 inline-block align-middle shrink-0" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                Procesando…
+                                <span class="align-middle">Procesando…</span>
                             </span>
                         </button>
                     </div>
                 @endif
             </div>
         </div>
-    @endif
-</div>
+</dialog>
+
+{{-- The modal above uses the native `<dialog>` element so it pops up in
+     the browser's top layer and is NOT constrained by any ancestor's
+     `transform`/`filter`/`backdrop-filter`/etc. (which would create a
+     containing block for fixed positioning and break `position: fixed;
+     inset: 0` — that's what was happening: the modal was being rendered
+     at `top: 3124` because an ancestor in the Livewire component chain
+     had a transform-style utility). The dialog is shown via
+     `showModal()` and hidden via `close()` from the morph.updated hook. --}}
+<script>
+    document.addEventListener('livewire:init', () => {
+        Livewire.hook('morph.updated', ({ el, component }) => {
+            const state = component.snapshot?.data?.subscribeModalOpen;
+            if (state === undefined) return;
+            const modal = document.getElementById('subscribe-modal');
+            if (!modal) return;
+            if (state === true) {
+                if (!modal.open) modal.showModal();
+            } else {
+                if (modal.open) modal.close();
+            }
+        });
+    });
+</script>
