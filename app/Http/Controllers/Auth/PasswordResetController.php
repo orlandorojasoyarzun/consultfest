@@ -107,7 +107,11 @@ class PasswordResetController extends Controller
         DB::table('password_reset_tokens')->where('email', $validated['email'])->delete();
 
         session()->regenerate();
-        session(['subscriber_id' => $subscriber->id]);
+        session([
+            'subscriber_id' => $subscriber->id,
+            // See AuthController::login() — same reason.
+            'subscriber_email' => $subscriber->email,
+        ]);
 
         return redirect()->route('dashboard')
             ->with('auth-flash', 'Contraseña actualizada. Bienvenido, '.$subscriber->name.'.');

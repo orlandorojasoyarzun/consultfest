@@ -6,14 +6,18 @@
     <title>Festivales - Consultfest</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <script>
-        (function () {
+        // Theme init must run after the body exists. Earlier inline versions
+        // crashed at page load with "Cannot read properties of null (reading
+        // 'setAttribute')" because document.body was null when this ran in
+        // <head>, which broke Livewire's downstream JS handling.
+        document.addEventListener('DOMContentLoaded', function () {
             const stored = localStorage.getItem('consultfest-theme');
             const theme = stored || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
             document.body.setAttribute('data-theme', theme);
             if (theme === 'dark') {
                 document.body.classList.add('dark');
             }
-        })();
+        });
     </script>
     @fonts
     @if(file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))

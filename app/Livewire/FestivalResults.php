@@ -3,10 +3,11 @@
 namespace App\Livewire;
 
 use App\Models\Festival;
+use App\Models\Subscriber;
 use App\Services\FestivalApiService;
 use App\Services\FestivalRateLimitException;
 use App\Services\FestivalSearchService;
-use Illuminate\Support\Facades\Http;
+use App\Services\FestivalSubscriptionService;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
@@ -89,14 +90,19 @@ class FestivalResults extends Component
         'search-festivals' => 'search',
     ];
 
-    public function boot(FestivalSearchService $search, FestivalApiService $api): void
-    {
+    public function boot(
+        FestivalSearchService $search,
+        FestivalApiService $api,
+        FestivalSubscriptionService $subscriptionService,
+    ): void {
         $this->searchService = $search;
         $this->apiService = $api;
+        $this->subscriptionService = $subscriptionService;
     }
 
     private FestivalSearchService $searchService;
     private FestivalApiService $apiService;
+    private FestivalSubscriptionService $subscriptionService;
 
     public function mount()
     {
@@ -159,8 +165,17 @@ class FestivalResults extends Component
         $this->subscribeFestivalName = $this->festivalNames[$apiId] ?? '';
         $this->subscribeModalOpen = true;
         $this->subscribeLoading = true;
+        $subscriberId = session('subscriber_id');
+        $this->subscribeSubscriberLoggedIn = $subscriberId !== null;
         $this->subscriberEmail = session('subscriber_email');
-        $this->subscribeSubscriberLoggedIn = session()->has('subscriber_id');
+        // Self-heal: users who logged in before the bugfix that started
+        // setting subscriber_email in the session will have subscriber_id
+        // but no email key, which makes the modal render the "you need an
+        // account" branch. Look up the email from the DB once per request
+        // so they don't have to log out / back in to recover.
+        if ($this->subscribeSubscriberLoggedIn && !$this->subscriberEmail) {
+            $this->subscriberEmail = Subscriber::whereKey($subscriberId)->value('email');
+        }
 
         try {
             $festival = Festival::where('api_id', $apiId)->first();
@@ -203,8 +218,12 @@ class FestivalResults extends Component
     }
 
     /**
-     * POST to /subscribe. On success, close modal and show toast. On
-     * failure, surface the error inline.
+     * Run the subscribe flow via FestivalSubscriptionService — NOT via
+     * Http::post() to our own /festivals/subscribe route. The loopback
+     * pattern deadlocks the PHP session lock (the Livewire request holds
+     * it, the loopback request waits for it, and PHP max_execution_time
+     * fires at 30s). Going through the service skips the round-trip
+     * entirely and shares the same code path as FestivalController::subscribe.
      */
     public function confirmSubscribe(): void
     {
@@ -227,25 +246,25 @@ class FestivalResults extends Component
         $this->subscribeError = null;
 
         try {
-            $response = Http::asForm()->post(route('festivals.subscribe'), [
-                'festival_api_id' => $this->subscribeFestivalApiId,
-                'notification_type' => $this->subscribeNotificationType,
-            ]);
+            $result = $this->subscriptionService->subscribe(
+                (int) session('subscriber_id'),
+                $this->subscribeFestivalApiId,
+                $this->subscribeNotificationType,
+            );
 
-            if ($response->successful()) {
+            if ($result->ok) {
                 $this->subscribeSuccess = true;
                 $this->subscribeModalOpen = false;
                 return;
             }
 
-            $payload = $response->json();
-            $this->subscribeError = $payload['error'] ?? 'No pudimos completar la suscripción.';
+            $this->subscribeError = $result->error ?? 'No pudimos completar la suscripción.';
         } catch (\Throwable $e) {
             Log::error('FestivalResults::confirmSubscribe failed', [
                 'api_id' => $this->subscribeFestivalApiId,
                 'error' => $e->getMessage(),
             ]);
-            $this->subscribeError = 'Error de red. Revisá tu conexión.';
+            $this->subscribeError = 'Error inesperado. Revisá tu conexión.';
         } finally {
             $this->subscribeLoading = false;
         }

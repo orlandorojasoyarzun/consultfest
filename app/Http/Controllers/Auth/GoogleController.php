@@ -67,7 +67,12 @@ class GoogleController extends Controller
             ],
         );
 
-        session(['subscriber_id' => $subscriber->id]);
+        session([
+            'subscriber_id' => $subscriber->id,
+            // See AuthController::login() — the subscribe modal needs
+            // subscriber_email to flip its "logged in" branch.
+            'subscriber_email' => $subscriber->email,
+        ]);
 
         return redirect()->route('dashboard')
             ->with('auth-flash', 'Bienvenido, '.$subscriber->name.'.');
@@ -76,6 +81,7 @@ class GoogleController extends Controller
     public function logout(): RedirectResponse
     {
         session()->forget('subscriber_id');
+        session()->forget('subscriber_email');
         session()->regenerate();
 
         // Forget the remember cookie if it's there. Cookie::queue attaches

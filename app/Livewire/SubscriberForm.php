@@ -68,7 +68,11 @@ class SubscriberForm extends Component
                 'phone' => $this->phone,
                 'notifications_enabled' => $this->notificationsEnabled,
             ]);
-            session(['subscriber_id' => $this->subscriber->id]);
+            session([
+                'subscriber_id' => $this->subscriber->id,
+                // See AuthController::login() — same reason.
+                'subscriber_email' => $this->subscriber->email,
+            ]);
         }
 
         $this->isRegistered = true;
