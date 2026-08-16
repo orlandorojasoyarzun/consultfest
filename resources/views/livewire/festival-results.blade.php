@@ -51,6 +51,8 @@
                                 <h3 class="text-lg font-medium truncate">
                                     <a
                                         href="{{ route('festivals.redirect', ['apiId' => $festival->apiId]) }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         class="text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
                                     >
                                         {{ $festival->name }}
