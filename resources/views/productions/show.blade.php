@@ -129,9 +129,6 @@
             <a href="{{ route('productions.edit', $production) }}" class="cinema-btn px-6 py-2.5 text-sm">
                 Editar
             </a>
-            <a href="{{ route('productions.matches', $production) }}" class="cinema-btn-outline px-6 py-2.5 text-sm">
-                Ver matches sugeridos
-            </a>
             <form action="{{ route('productions.destroy', $production) }}" method="POST" class="ml-auto"
                 onsubmit="return confirm('¿Eliminar esta producción? No se puede deshacer.');">
                 @csrf @method('DELETE')

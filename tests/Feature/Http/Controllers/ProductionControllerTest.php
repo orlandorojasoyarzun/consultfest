@@ -593,7 +593,11 @@ class ProductionControllerTest extends TestCase
         $response = $this->get(route('productions.show', $production));
         $response->assertStatus(200);
         $response->assertSee('Corto de prueba');
-        $response->assertSee('Ver matches sugeridos');
+        $response->assertSee('Editar');
+        // The black "Ver matches sugeridos" button was removed: the yellow
+        // "Ver matches" CTA at the top of the page already leads there, so
+        // showing a second outline button at the bottom was redundant.
+        $response->assertDontSee('Ver matches sugeridos');
     }
 
     public function test_get_productions_index_is_not_rate_limited(): void

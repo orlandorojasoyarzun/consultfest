@@ -2,10 +2,12 @@
 
 namespace App\Livewire;
 
+use App\Models\Festival;
 use App\Services\FestivalApiService;
 use App\Services\FestivalRateLimitException;
 use App\Services\FestivalSearchService;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class FestivalResults extends Component
@@ -45,6 +47,33 @@ class FestivalResults extends Component
      */
     public bool $isApiNotConfigured = false;
 
+    // ──────────────────────────────────────────────────────────────────
+    // Subscribe modal state (inlined here so the button works without
+    // cross-component dispatch). The modal markup is rendered inline at
+    // the bottom of festival-results.blade.php; toggling $isOpen
+    // directly from the wire:click handler is parent-child state, so
+    // Livewire updates the modal reliably in production.
+    // ──────────────────────────────────────────────────────────────────
+
+    public bool $subscribeModalOpen = false;
+    public ?int $subscribeFestivalApiId = null;
+    public string $subscribeFestivalName = '';
+    public string $subscribeCountry = '';
+    public string $subscribeCity = '';
+    public string $subscribePrimaryCategory = '';
+    public string $subscribeDeadline = '';
+    public string $subscribeOpeningDate = '';
+    public string $subscribeRegularFee = '';
+    public string $subscribeSubmissionUrl = '';
+    public string $subscribeWebsite = '';
+    public string $subscribeNotificationType = 'both';
+    public bool $subscribeLoading = false;
+    public ?string $subscribeError = null;
+    public bool $subscribeSuccess = false;
+    public ?string $subscriberEmail = null;
+    public bool $subscribeEmailConfirmed = false;
+    public bool $subscribeSubscriberLoggedIn = false;
+
     protected $listeners = [
         'search-festivals' => 'search',
     ];
@@ -57,34 +86,6 @@ class FestivalResults extends Component
 
     private FestivalSearchService $searchService;
     private FestivalApiService $apiService;
-
-    /**
-     * Forward an open-subscribe-modal event to FestivalSubscribeModal.
-     * The card's `wire:click="openSubscribeModal(...)"` invocation lands
-     * here; we re-dispatch using the EXACT same pattern FestivalCalendar
-     * uses to reach FestivalResults: `$this->dispatch(event, params)->to(FullClassName::class)`.
-     *
-     * That pattern is the one that works in production on this codebase.
-     * Previous attempts at "global" dispatch (no `->to()`) and targeted
-     * dispatch with a kebab alias (`->to('festival-subscribe-modal')`)
-     * both failed in production: the modal listener fired server-side
-     * but the client never received an update.
-     *
-     * The modal subscribes via the legacy `$listeners` array (same
-     * convention FestivalResults uses to receive `search-festivals`),
-     * keeping the listener style consistent across sibling components.
-     *
-     * Important: this is a regular method, NOT a `#[On(...)]` listener
-     * on FestivalResults. If we registered `#[On('open-subscribe-modal')`
-     * here as well, the listener would re-fire on every dispatch
-     * (including the one we send below), creating an infinite loop.
-     * Only FestivalSubscribeModal subscribes.
-     */
-    public function openSubscribeModal(int $apiId, string $name): void
-    {
-        $this->dispatch('open-subscribe-modal', apiId: $apiId, name: $name)
-            ->to(FestivalSubscribeModal::class);
-    }
 
     public function mount()
     {
@@ -100,10 +101,7 @@ class FestivalResults extends Component
         $this->isRateLimited = false;
         $this->isApiNotConfigured = false;
 
-        // Persist the last filters so paginate() can re-apply them when the
-        // user clicks "next".
         $this->filters = $filters;
-        // New search means we're back on page 1.
         $this->page = 1;
 
         $this->isLoading = false;
@@ -124,12 +122,116 @@ class FestivalResults extends Component
         $this->page = max(1, $this->page - 1);
     }
 
+    // ──────────────────────────────────────────────────────────────────
+    // Subscribe modal — open / close / confirm. All state lives here so
+    // the button's wire:click just flips $subscribeModalOpen.
+    // ──────────────────────────────────────────────────────────────────
+
+    /**
+     * Open the modal and fetch the festival preview. Called from the
+     * `+ Suscribirme` button via `wire:click="openSubscribeModal(...)"`.
+     */
+    public function openSubscribeModal(int $apiId, string $name): void
+    {
+        $this->resetSubscribeState();
+        $this->subscribeFestivalApiId = $apiId;
+        $this->subscribeFestivalName = $name;
+        $this->subscribeModalOpen = true;
+        $this->subscribeLoading = true;
+        $this->subscriberEmail = session('subscriber_email');
+        $this->subscribeSubscriberLoggedIn = session()->has('subscriber_id');
+
+        try {
+            $festival = Festival::where('api_id', $apiId)->first();
+            if (!$festival) {
+                $synced = app(FestivalApiService::class)->syncFestivalDetails($apiId);
+                if (!$synced) {
+                    $this->subscribeError = 'No pudimos cargar la información del festival. Intentá de nuevo.';
+                    return;
+                }
+                $festival = Festival::where('api_id', $apiId)->first();
+            }
+
+            if (!$festival) {
+                $this->subscribeError = 'Festival no encontrado.';
+                return;
+            }
+
+            $this->hydrateSubscribeFromModel($festival);
+        } catch (\Throwable $e) {
+            Log::error('FestivalResults::openSubscribeModal failed', [
+                'api_id' => $apiId,
+                'error' => $e->getMessage(),
+            ]);
+            $this->subscribeError = 'Error inesperado al cargar el festival.';
+        } finally {
+            $this->subscribeLoading = false;
+        }
+    }
+
+    public function closeSubscribeModal(): void
+    {
+        $this->subscribeModalOpen = false;
+        $this->resetSubscribeState();
+    }
+
+    public function dismissSubscribeSuccess(): void
+    {
+        $this->subscribeSuccess = false;
+        $this->resetSubscribeState();
+    }
+
+    /**
+     * POST to /subscribe. On success, close modal and show toast. On
+     * failure, surface the error inline.
+     */
+    public function confirmSubscribe(): void
+    {
+        if (!$this->subscribeFestivalApiId) {
+            $this->subscribeError = 'Festival inválido.';
+            return;
+        }
+
+        if (!$this->subscribeSubscriberLoggedIn) {
+            $this->subscribeError = 'Necesitás tener una cuenta para suscribirte.';
+            return;
+        }
+
+        if (!$this->subscribeEmailConfirmed) {
+            $this->subscribeError = 'Confirmá que el email es correcto antes de suscribirte.';
+            return;
+        }
+
+        $this->subscribeLoading = true;
+        $this->subscribeError = null;
+
+        try {
+            $response = Http::asForm()->post(route('festivals.subscribe'), [
+                'festival_api_id' => $this->subscribeFestivalApiId,
+                'notification_type' => $this->subscribeNotificationType,
+            ]);
+
+            if ($response->successful()) {
+                $this->subscribeSuccess = true;
+                $this->subscribeModalOpen = false;
+                return;
+            }
+
+            $payload = $response->json();
+            $this->subscribeError = $payload['error'] ?? 'No pudimos completar la suscripción.';
+        } catch (\Throwable $e) {
+            Log::error('FestivalResults::confirmSubscribe failed', [
+                'api_id' => $this->subscribeFestivalApiId,
+                'error' => $e->getMessage(),
+            ]);
+            $this->subscribeError = 'Error de red. Revisá tu conexión.';
+        } finally {
+            $this->subscribeLoading = false;
+        }
+    }
+
     public function render()
     {
-        // If FestivalAPI isn't wired up on this deploy, skip the search
-        // round-trip entirely and surface a friendly message. Without this
-        // guard the empty result list would be indistinguishable from a
-        // broken search.
         if (!$this->apiService->isConfigured()) {
             $this->isApiNotConfigured = true;
             $results = collect();
@@ -144,8 +246,6 @@ class FestivalResults extends Component
             ]);
         }
 
-        // Run the search. We catch the rate-limit exception so the UI
-        // degrades to a friendly message instead of a 500.
         try {
             $results = $this->searchService->search($this->filters);
             $this->isRateLimited = false;
@@ -154,25 +254,12 @@ class FestivalResults extends Component
             $this->isRateLimited = true;
         }
 
-        // FestivalAPI returns up to 100 results. We slice locally to fit
-        // the 10-per-page UI.
         $perPage = self::PER_PAGE;
         $totalPages = max(1, (int) ceil($results->count() / $perPage));
-        // Defensive: a stale $page from a previous larger result set could
-        // point past the end. Clamp it.
         $this->page = min($this->page, $totalPages);
 
         $items = $results->slice(($this->page - 1) * $perPage, $perPage)
             ->values();
-
-        // Detail enrichment used to happen here (1 credit per visible card,
-        // 10/page, 100/page if you paginate). At ~5 credits per real visit
-        // and the user's API budget, we switched to lazy enrichment:
-        // detail is only fetched when the user actually clicks "Suscribirme"
-        // or "Ver sitio" (see enrichAnd* methods). That keeps browsing the
-        // list at 1 credit (list call) and only spends 1 more when the user
-        // signals real intent — and it's cached 24h per apiId so the same
-        // festival on the same day stays free.
 
         return view('livewire.festival-results', [
             'totalCount' => $results->count(),
@@ -188,5 +275,50 @@ class FestivalResults extends Component
     public function getCurrentPage(): int
     {
         return $this->page;
+    }
+
+    private function hydrateSubscribeFromModel(Festival $festival): void
+    {
+        $this->subscribeCountry = $festival->country ?? '';
+        $details = $festival->details ?? [];
+        $this->subscribeCity = is_string($details['city'] ?? null) ? $details['city'] : '';
+        $this->subscribePrimaryCategory = $festival->category ?? '';
+        $this->subscribeDeadline = $festival->deadline?->format('M d, Y') ?? '';
+        $this->subscribeOpeningDate = $festival->opening_date?->format('M d, Y') ?? '';
+        $this->subscribeRegularFee = $festival->submission_fee !== null
+            ? '$' . number_format($festival->submission_fee, 2)
+            : '';
+        $this->subscribeSubmissionUrl = $this->extractUrl($details['submission_url'] ?? null);
+        $this->subscribeWebsite = $this->extractUrl($details['website'] ?? $details['url'] ?? null);
+    }
+
+    private function extractUrl(mixed $candidate): string
+    {
+        if (!is_string($candidate)) {
+            return '';
+        }
+        $trimmed = trim($candidate);
+        return $trimmed === '' ? '' : $trimmed;
+    }
+
+    private function resetSubscribeState(): void
+    {
+        $this->subscribeFestivalApiId = null;
+        $this->subscribeFestivalName = '';
+        $this->subscribeCountry = '';
+        $this->subscribeCity = '';
+        $this->subscribePrimaryCategory = '';
+        $this->subscribeDeadline = '';
+        $this->subscribeOpeningDate = '';
+        $this->subscribeRegularFee = '';
+        $this->subscribeSubmissionUrl = '';
+        $this->subscribeWebsite = '';
+        $this->subscribeNotificationType = 'both';
+        $this->subscribeLoading = false;
+        $this->subscribeError = null;
+        $this->subscribeSuccess = false;
+        $this->subscriberEmail = null;
+        $this->subscribeEmailConfirmed = false;
+        $this->subscribeSubscriberLoggedIn = false;
     }
 }
