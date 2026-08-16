@@ -6,18 +6,20 @@ use App\Data\FestivalData;
 use App\Models\Festival;
 use App\Models\Subscriber;
 use App\Models\Subscription;
-use App\Notifications\FestivalSubscribedNotification;
 use App\Notifications\FestivalUnsubscribedNotification;
 use App\Services\FestivalApiService;
 use App\Services\FestivalSearchService;
+use App\Services\FestivalSubscriptionService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class FestivalController extends Controller
 {
-    public function __construct(private readonly NotificationService $notifications)
-    {
+    public function __construct(
+        private readonly NotificationService $notifications,
+        private readonly FestivalSubscriptionService $subscriptionService,
+    ) {
     }
 
     /**
@@ -158,43 +160,19 @@ class FestivalController extends Controller
             return response()->json(['error' => 'Not registered'], 401);
         }
 
-        $festival = Festival::where('api_id', $request->festival_api_id)->first();
-
-        // Sync on-demand: if the festival is in FestivalAPI but not yet in
-        // our local DB (the normal case after migrate:fresh), fetch its
-        // detail payload, persist it, and continue. Costs 1 FestivalAPI
-        // credit per new festival. For 1 user this is fine; for scale, batch.
-        if (!$festival) {
-            $synced = app(FestivalApiService::class)->syncFestivalDetails($request->festival_api_id);
-            if (!$synced) {
-                return response()->json(['error' => 'Festival not found in FestivalAPI'], 404);
-            }
-            $festival = Festival::where('api_id', $request->festival_api_id)->first();
-            if (!$festival) {
-                return response()->json(['error' => 'Festival not found after sync'], 500);
-            }
-        }
-
-        Subscription::updateOrCreate(
-            [
-                'subscriber_id' => $subscriberId,
-                'festival_id' => $festival->id,
-            ],
-            [
-                'notification_type' => $request->notification_type,
-            ]
+        // Logic lives in FestivalSubscriptionService so the Livewire modal
+        // (FestivalResults::confirmSubscribe) can run the exact same path
+        // without making an HTTP loopback to ourselves. Loopback was
+        // deadlocking the PHP session lock for 30s+ before this refactor.
+        $result = $this->subscriptionService->subscribe(
+            $subscriberId,
+            (int) $request->input('festival_api_id'),
+            (string) $request->input('notification_type'),
         );
 
-        // Confirmation email — synchronous. Tells the user the subscription
-        // was recorded and reminds them which notification type they chose.
-        // safeNotify() catches mail failures so a Resend outage doesn't
-        // surface as a 500 to the user (the subscription already landed).
-        $subscriber = Subscriber::find($subscriberId);
-        if ($subscriber) {
-            $this->notifications->safeNotify($subscriber, new FestivalSubscribedNotification(
-                $festival,
-                $request->notification_type,
-            ));
+        if (!$result->ok) {
+            $status = str_contains((string) $result->error, 'FestivalAPI') ? 404 : 422;
+            return response()->json(['error' => $result->error], $status);
         }
 
         return response()->json(['success' => true]);
