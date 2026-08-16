@@ -6,7 +6,6 @@ use App\Models\Festival;
 use App\Services\FestivalApiService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -25,12 +24,39 @@ use Livewire\Component;
  *    update visually (eventually — toggling subscription status
  *    visually is out of scope for this PR).
  *
+ * Listener wiring:
+ *  - We use the LEGACY `$listeners` array (the same pattern
+ *    FestivalResults uses to receive `search-festivals` from
+ *    FestivalCalendar). Livewire v4 supports both `#[On(...)]` and
+ *    `$listeners`; mixing them within the same event name across two
+ *    sibling components is what caused the original "button does
+ *    nothing" symptom in production. Standardising on `$listeners`
+ *    matches the rest of the codebase.
+ *  - FestivalResults dispatches with `->to(FestivalSubscribeModal::class)`
+ *    (full class name, not kebab alias). That is the EXACT pattern
+ *    FestivalCalendar uses to reach FestivalResults, and it's the one
+ *    that works on production.
+ *
  * Out of scope:
  *  - Updating the parent card's state after a successful subscribe
  *    (we just close the modal; the user reloads to see the change).
  */
 class FestivalSubscribeModal extends Component
 {
+    /**
+     * Listeners for events emitted by sibling Livewire components.
+     * `open-subscribe-modal` is fired by FestivalResults when the
+     * user clicks `+ Suscribirme` on a card. We map it to the `open`
+     * method, which hydrates the preview state.
+     *
+     * Legacy `protected $listeners` syntax (not the `#[On]` attribute)
+     * to match the convention already in use by FestivalResults and
+     * FestivalCalendar.
+     */
+    protected $listeners = [
+        'open-subscribe-modal' => 'open',
+    ];
+
     public bool $isOpen = false;
     public ?int $festivalApiId = null;
     public string $festivalName = '';
@@ -55,7 +81,6 @@ class FestivalSubscribeModal extends Component
      * Open the modal and fetch the preview data. We try the local DB first
      * (zero credits if already synced); fall back to FestivalAPI detail.
      */
-    #[On('open-subscribe-modal')]
     public function open(int $apiId, string $name): void
     {
         $this->resetState();

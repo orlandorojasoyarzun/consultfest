@@ -61,20 +61,29 @@ class FestivalResults extends Component
     /**
      * Forward an open-subscribe-modal event to FestivalSubscribeModal.
      * The card's `wire:click="openSubscribeModal(...)"` invocation lands
-     * here; we re-dispatch via Livewire v3's targeted `->to()` pattern
-     * (same as FestivalCalendar::search uses for `search-festivals`).
+     * here; we re-dispatch using the EXACT same pattern FestivalCalendar
+     * uses to reach FestivalResults: `$this->dispatch(event, params)->to(FullClassName::class)`.
      *
-     * Important: this is a regular method, NOT a `#[On(...)]` listener.
-     * If we registered both `wire:click` and `#[On('open-subscribe-modal')`
-     * on the same handler, the listener would re-fire on every dispatch
-     * (including the one we send here), causing either an infinite loop
-     * or a stale event landing in the modal. The actual listener lives
-     * on FestivalSubscribeModal and is the *target* of the dispatch.
+     * That pattern is the one that works in production on this codebase.
+     * Previous attempts at "global" dispatch (no `->to()`) and targeted
+     * dispatch with a kebab alias (`->to('festival-subscribe-modal')`)
+     * both failed in production: the modal listener fired server-side
+     * but the client never received an update.
+     *
+     * The modal subscribes via the legacy `$listeners` array (same
+     * convention FestivalResults uses to receive `search-festivals`),
+     * keeping the listener style consistent across sibling components.
+     *
+     * Important: this is a regular method, NOT a `#[On(...)]` listener
+     * on FestivalResults. If we registered `#[On('open-subscribe-modal')`
+     * here as well, the listener would re-fire on every dispatch
+     * (including the one we send below), creating an infinite loop.
+     * Only FestivalSubscribeModal subscribes.
      */
     public function openSubscribeModal(int $apiId, string $name): void
     {
         $this->dispatch('open-subscribe-modal', apiId: $apiId, name: $name)
-            ->to('festival-subscribe-modal');
+            ->to(FestivalSubscribeModal::class);
     }
 
     public function mount()

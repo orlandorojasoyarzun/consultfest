@@ -53,10 +53,19 @@
                           accidental navigation.
                        3) The bottom row (Fee/Abierto + Subscribe) is a
                           sibling of the <a>, never inside it. The Subscribe
-                          button calls openSubscribeModal() directly, which
-                          re-dispatches to FestivalSubscribeModal via
-                          Livewire's targeted ->to() (no #[On] on this side —
-                          that would conflict with wire:click).
+                          button calls openSubscribeModal() which dispatches
+                          `open-subscribe-modal` targeted at
+                          FestivalSubscribeModal via `->to(FQCN::class)`.
+                          That matches the exact pattern FestivalCalendar
+                          uses to reach FestivalResults on this codebase
+                          (the only sibling-dispatch pattern that's been
+                          proven to work in production).
+                          The modal subscribes via the legacy `$listeners`
+                          array (same convention FestivalResults uses for
+                          `search-festivals`). We deliberately do NOT
+                          register a listener on FestivalResults itself —
+                          doing so would re-fire this handler on every
+                          dispatch and create an infinite loop.
                      Without this split, an inner <button> inside an <a>
                      triggers the link navigation in some browsers (the
                      button's "default action" is just click, but the
