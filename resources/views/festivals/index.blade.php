@@ -95,12 +95,9 @@
         </div>
     </main>
 
-    {{-- Global subscribe modal. Lives on this page because it's the only
-         page that has <livewire:festival-results />; the results component
-         dispatches `open-subscribe-modal` targeted at FestivalSubscribeModal
-         via `->to(FQCN::class)`, the same pattern FestivalCalendar uses to
-         reach FestivalResults. --}}
-    <livewire:festival-subscribe-modal />
+    {{-- Subscribe modal lives inline in festival-results.blade.php so the
+         button's wire:click toggles state on the same Livewire component.
+         No cross-component dispatch needed. --}}
 
     @livewireScripts
 </body>

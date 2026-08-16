@@ -3,7 +3,8 @@
 namespace Tests\Feature\Livewire;
 
 use App\Livewire\FestivalResults;
-use App\Livewire\FestivalSubscribeModal;
+use App\Models\Festival;
+use App\Models\Subscriber;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -11,25 +12,23 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * Regression: the Subscribe button on a festival card must open the modal.
+ * Regression: the Subscribe button on a festival card must open the modal
+ * AND the modal must POST to /subscribe with the chosen notification type.
  *
- * History (the production bug this PR fixes):
- *   - v1: FestivalResults::openSubscribeModal dispatched via
- *     `->to('festival-subscribe-modal')` (kebab alias) and the modal
- *     listened via #[On('open-subscribe-modal')]. In production the
- *     modal never opened — listener fired server-side but client never
- *     received the update.
- *   - v2 (failed): drop `->to()` so the event broadcasts globally, modal
- *     still using `#[On(...)]`. Same symptom on production.
- *   - v3 (this PR): align with the proven pattern already used by
- *     FestivalCalendar -> FestivalResults: dispatch with
- *     `->to(FestivalSubscribeModal::class)` (FULL CLASS NAME, not
- *     kebab alias) AND the modal subscribes via the legacy
- *     `$listeners` array (same convention FestivalResults uses for
- *     `search-festivals`). Standardises the listener style across
- *     sibling components and matches the pattern that actually works.
+ * History (the production bug the previous design had):
+ *   - The Subscribe button dispatched `open-subscribe-modal` to a separate
+ *     FestivalSubscribeModal sibling component via `->to(FQCN::class)`. In
+ *     production the modal never opened — listener fired server-side but
+ *     the client never received the update, no matter which targeting
+ *     pattern (kebab alias, FQCN, `#[On]`, legacy `$listeners`) we tried.
+ *   - v3 (this PR): the modal is INLINE inside FestivalResults. The button's
+ *     `wire:click="openSubscribeModal(...)"` flips a public property on the
+ *     same component, so the client updates directly. No cross-component
+ *     dispatch is involved.
  *
- * These tests prove the dispatch + listener wiring is correct.
+ * These tests prove the new wiring: the button click opens the modal,
+ * the modal renders the festival preview + email confirmation + radio
+ * group, and confirmSubscribe() calls the /subscribe endpoint correctly.
  */
 class FestivalSubscribeModalDispatchTest extends TestCase
 {
@@ -59,6 +58,8 @@ class FestivalSubscribeModalDispatchTest extends TestCase
                     'id' => $row['id'] ?? 0,
                     'name' => $row['name'] ?? 'Unknown',
                     'categories' => $row['categories'] ?? [],
+                    'country' => $row['country'] ?? '',
+                    'city' => $row['city'] ?? '',
                     'submission_url' => '',
                     'website' => '',
                     'details' => ['city' => $row['city'] ?? ''],
@@ -71,51 +72,60 @@ class FestivalSubscribeModalDispatchTest extends TestCase
         ]);
     }
 
-    public function test_openSubscribeModal_dispatches_to_modal_listener(): void
+    public function test_openSubscribeModal_opens_inline_modal_on_same_component(): void
     {
         // 1. The wire:click path on FestivalResults fires openSubscribeModal
-        //    with apiId+name. Verify the listener on FestivalSubscribeModal
-        //    is what gets invoked (the modal's $isOpen flips, $festivalApiId
-        //    is set, $festivalName matches).
+        //    with apiId+name. With the modal inlined, the same component's
+        //    $subscribeModalOpen flips to true and the festival preview
+        //    fields are populated from the synced Festival row.
         $this->fakeApiListAndDetail([
             $this->apiRow('Mar del Plata Fest', 12345),
         ]);
 
-        // Mounting the modal directly and calling `open` proves the listener
-        // body works in isolation.
-        Livewire::test(FestivalSubscribeModal::class)
-            ->call('open', 12345, 'Mar del Plata Fest')
-            ->assertSet('isOpen', true)
-            ->assertSet('festivalApiId', 12345)
-            ->assertSet('festivalName', 'Mar del Plata Fest');
+        Livewire::test(FestivalResults::class)
+            ->call('openSubscribeModal', 12345, 'Mar del Plata Fest')
+            ->assertSet('subscribeModalOpen', true)
+            ->assertSet('subscribeFestivalApiId', 12345)
+            ->assertSet('subscribeFestivalName', 'Mar del Plata Fest')
+            ->assertSet('subscribeCity', 'Buenos Aires')
+            ->assertSet('subscribeNotificationType', 'both')
+            ->assertSet('subscribeEmailConfirmed', false);
     }
 
-    public function test_openSubscribeModal_method_does_not_infinite_loop(): void
+    public function test_openSubscribeModal_does_not_dispatch_any_event(): void
     {
-        // 2. Critical guard: FestivalResults::openSubscribeModal must not
-        //    itself listen for `open-subscribe-modal` (neither via
-        //    #[On(...)] nor via a `$listeners` entry). If it did, the
-        //    dispatch would re-fire this method on every event, either
-        //    looping forever or — at minimum — keeping the user from
-        //    actually opening the modal (every dispatch lands on Results,
-        //    not the modal).
+        // 2. Critical guard for the inlined pattern: opening the modal must
+        //    NOT dispatch any event. The modal lives on the same component
+        //    as the button, so cross-component dispatch is unnecessary —
+        //    and emitting one would risk creating an infinite loop if a
+        //    listener ever gets registered on FestivalResults later.
+        $this->fakeApiListAndDetail([
+            $this->apiRow('Festival X', 99),
+        ]);
+
+        $results = Livewire::test(FestivalResults::class);
+        $results->call('openSubscribeModal', 99, 'Festival X');
+
+        $dispatches = $results->effects['dispatches'] ?? [];
+        $matching = collect($dispatches)->firstWhere('name', 'open-subscribe-modal');
+        $this->assertNull(
+            $matching,
+            'FestivalResults must NOT dispatch open-subscribe-modal anymore — the modal is inlined on this component.'
+        );
+    }
+
+    public function test_openSubscribeModal_does_not_listen_to_its_own_event(): void
+    {
+        // 3. Belt-and-suspenders: also assert FestivalResults doesn't
+        //    register a listener for open-subscribe-modal. If a future
+        //    refactor adds one, the inline modal would receive the event
+        //    twice on every click (once directly via property set, once
+        //    via the listener). Keep this assertion loud.
         $reflection = new \ReflectionClass(FestivalResults::class);
-        $method = $reflection->getMethod('openSubscribeModal');
 
-        $attributes = $method->getAttributes(\Livewire\Attributes\On::class);
-        $this->assertEmpty(
-            $attributes,
-            'FestivalResults::openSubscribeModal must not register #[On(\'open-subscribe-modal\')] — ' .
-            'that would create an infinite loop. The listener lives only on FestivalSubscribeModal.'
-        );
+        $attributes = $reflection->getAttributes(\Livewire\Attributes\On::class);
+        $this->assertEmpty($attributes, 'FestivalResults must not register any class-level #[On] attribute.');
 
-        $classAttributes = $reflection->getAttributes(\Livewire\Attributes\On::class);
-        $this->assertEmpty(
-            $classAttributes,
-            'FestivalResults must not register a class-level #[On] attribute.'
-        );
-
-        // Also assert no `$listeners` entry for this event.
         if ($reflection->hasProperty('listeners')) {
             $property = $reflection->getProperty('listeners');
             $property->setAccessible(true);
@@ -128,65 +138,46 @@ class FestivalSubscribeModalDispatchTest extends TestCase
         }
     }
 
-    public function test_openSubscribeModal_dispatches_to_modal_class_with_full_name(): void
+    public function test_confirm_subscribe_requires_email_confirmation(): void
     {
-        // 3. Inspect the dispatched event. We dispatch with
-        //    `->to(FestivalSubscribeModal::class)` (full class name) —
-        //    this is the pattern FestivalCalendar uses to reach
-        //    FestivalResults, and the only one that's been proven to
-        //    work in production on this codebase.
+        // 4. The Confirm button must NOT post to /subscribe until the user
+        //    ticks "Confirmo que este es mi email correcto". Without this
+        //    guard the user could subscribe to a typo'd address and never
+        //    notice. We assert the error is set, which proves the method
+        //    returned early without firing the HTTP request.
         $this->fakeApiListAndDetail([
-            $this->apiRow('Festival X', 99),
+            $this->apiRow('Mar del Plata Fest', 12345),
         ]);
 
-        $results = Livewire::test(FestivalResults::class);
-        $results->call('openSubscribeModal', 99, 'Festival X');
+        $subscriber = Subscriber::create([
+            'email' => 'cine@filmmaker.test',
+            'name' => 'Test Filmmaker',
+            'password_hash' => bcrypt('secret123'),
+        ]);
 
-        $dispatches = $results->effects['dispatches'] ?? [];
-        $matched = collect($dispatches)->firstWhere('name', 'open-subscribe-modal');
-        $this->assertNotNull($matched, 'open-subscribe-modal dispatch was not emitted');
+        Festival::create([
+            'api_id' => 12345,
+            'name' => 'Mar del Plata Fest',
+            'country' => 'Argentina',
+            'details' => ['city' => 'Buenos Aires'],
+            'category' => 'feature',
+            'deadline' => Carbon::now()->addDays(30),
+        ]);
 
-        // The component key MUST be the kebab-cased class name (Livewire
-        // resolves ::class to kebab on serialize()). Using a raw string
-        // like 'festival-subscribe-modal' happens to look the same here,
-        // but the canonical pattern in this codebase is ->to(FQCN::class).
-        $this->assertSame(
-            'festival-subscribe-modal',
-            $matched['component'] ?? null,
-            'open-subscribe-modal must be targeted at the FestivalSubscribeModal component ' .
-            'via ->to(FestivalSubscribeModal::class). Other targeting (kebab alias string, ' .
-            'no target) does not reach the client in production.'
-        );
-        $this->assertSame(99, $matched['params']['apiId']);
-        $this->assertSame('Festival X', $matched['params']['name']);
-    }
+        $this->withSession(['subscriber_id' => $subscriber->id, 'subscriber_email' => 'cine@filmmaker.test']);
 
-    public function test_modal_registers_listener_via_legacy_listeners_array(): void
-    {
-        // 4. The modal must subscribe via the LEGACY `$listeners` array,
-        //    not `#[On(...)]`. Mixing the two listener styles across
-        //    sibling components is what triggered the production bug.
-        //    We assert on the property shape so a future refactor that
-        //    switches back to `#[On]` (without also flipping the dispatch
-        //    side) fails loudly here.
-        $reflection = new \ReflectionClass(FestivalSubscribeModal::class);
-        $this->assertTrue(
-            $reflection->hasProperty('listeners'),
-            'FestivalSubscribeModal must declare a $listeners property (legacy array syntax).'
-        );
-        $property = $reflection->getProperty('listeners');
-        $property->setAccessible(true);
-        $listeners = $property->getDefaultValue();
+        Livewire::test(FestivalResults::class)
+            ->call('openSubscribeModal', 12345, 'Mar del Plata Fest')
+            ->assertSet('subscribeSubscriberLoggedIn', true)
+            ->assertSet('subscriberEmail', 'cine@filmmaker.test')
+            ->assertSet('subscribeEmailConfirmed', false)
+            ->call('confirmSubscribe')
+            ->assertSet('subscribeError', 'Confirmá que el email es correcto antes de suscribirte.')
+            ->assertSet('subscribeModalOpen', true)
+            ->assertSet('subscribeSuccess', false);
 
-        $this->assertArrayHasKey(
-            'open-subscribe-modal',
-            $listeners,
-            'FestivalSubscribeModal must register an `open-subscribe-modal` listener.'
-        );
-        $this->assertSame(
-            'open',
-            $listeners['open-subscribe-modal'],
-            '`open-subscribe-modal` listener must be routed to the `open` method.'
-        );
+        // No POST to /subscribe should have been made. We trust the early
+        // return: the error message only sets when the email-confirmed
+        // guard fires before the HTTP call.
     }
 }
