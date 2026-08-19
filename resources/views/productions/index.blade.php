@@ -86,7 +86,7 @@
         @else
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 @foreach($productions as $production)
-                    <article class="cinema-card p-6">
+                    <article class="cinema-card p-6 cinema-fade-up" style="animation-delay: {{ min($loop->index * 60, 600) }}ms">
                         <div class="flex items-start justify-between gap-3 mb-4">
                             <div class="flex-1 min-w-0">
                                 <h2 class="text-lg font-semibold tracking-tight mb-1 truncate">{{ $production->title }}</h2>

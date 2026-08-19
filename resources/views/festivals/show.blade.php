@@ -97,7 +97,7 @@
         </div>
 
         <div class="grid grid-cols-2 gap-3 mb-12">
-            <div class="cinema-card p-6">
+            <div class="cinema-card p-6 cinema-fade-up cinema-stagger-1">
                 <div class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-3">Apertura</div>
                 @if($festival->opening_date)
                     <div class="text-2xl font-semibold tabular-nums">{{ $festival->opening_date->format('M d, Y') }}</div>
@@ -106,7 +106,7 @@
                 @endif
             </div>
 
-            <div class="cinema-card p-6">
+            <div class="cinema-card p-6 cinema-fade-up cinema-stagger-2">
                 <div class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-3">Deadline</div>
                 @if($festival->deadline)
                     <div class="text-2xl font-semibold tabular-nums mb-2">{{ $festival->deadline->format('M d, Y') }}</div>
@@ -120,7 +120,7 @@
             </div>
         </div>
 
-        <div class="cinema-card p-6 mb-6">
+        <div class="cinema-card p-6 mb-6 cinema-fade-up cinema-stagger-3">
             <div class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-4">Detalles</div>
             <div class="grid grid-cols-2 gap-6">
                 <div>
@@ -147,7 +147,7 @@
         </div>
 
         @if(isset($festival->details['genres']) && is_array($festival->details['genres']))
-            <div class="cinema-card p-6 mb-6">
+            <div class="cinema-card p-6 mb-6 cinema-fade-up cinema-stagger-4">
                 <div class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-4">Géneros</div>
                 <div class="flex flex-wrap gap-2">
                     @foreach($festival->details['genres'] as $genre)
@@ -159,7 +159,7 @@
             </div>
         @endif
 
-        <div class="cinema-card p-6">
+        <div class="cinema-card p-6 cinema-fade-up cinema-stagger-5">
             <div class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-4">Notificaciones</div>
 
             @if(session('success'))

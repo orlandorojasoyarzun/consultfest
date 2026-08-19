@@ -74,7 +74,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
 
             {{-- Producciones --}}
-            <section class="lg:col-span-7 cinema-card p-7">
+            <section class="lg:col-span-7 cinema-card p-7 cinema-fade-up cinema-stagger-1">
                 <div class="flex items-baseline justify-between mb-6">
                     <h2 class="text-sm font-semibold tracking-wide uppercase text-[var(--text-muted)]">Producciones</h2>
                     <span class="text-xs text-[var(--text-faintest)] tabular-nums">{{ $productions->count() }}</span>
@@ -119,7 +119,7 @@
             </section>
 
             {{-- Suscripciones --}}
-            <section class="lg:col-span-5 cinema-card p-7">
+            <section class="lg:col-span-5 cinema-card p-7 cinema-fade-up cinema-stagger-2">
                 <div class="flex items-baseline justify-between mb-6">
                     <h2 class="text-sm font-semibold tracking-wide uppercase text-[var(--text-muted)]">Tus festivales</h2>
                     <span class="text-xs text-[var(--text-faintest)] tabular-nums">{{ $subscriptions->count() }}</span>
