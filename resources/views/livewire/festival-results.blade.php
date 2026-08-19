@@ -43,7 +43,7 @@
         <div class="space-y-2">
             @foreach($festivals as $festival)
                 <div
-                    class="cinema-card p-6 hover:border-[var(--border-hover)] group"
+                    class="cinema-card p-6 hover:border-[var(--border-hover)] group cinema-fade-up" style="animation-delay: {{ min($loop->index * 80, 800) }}ms"
                 >
                     <div class="flex items-start justify-between gap-6">
                         <div class="flex-1 min-w-0">

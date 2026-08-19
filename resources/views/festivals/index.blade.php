@@ -76,7 +76,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <aside class="lg:col-span-4 space-y-6">
-                <div class="cinema-card p-7">
+                <div class="cinema-card p-7 cinema-fade-up cinema-stagger-1">
                     <div class="flex items-center justify-between mb-6">
                         <h3 class="text-sm font-semibold tracking-wide uppercase text-[var(--text-muted)]">Filtros</h3>
                         <svg class="w-4 h-4 text-[var(--text-faintest)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

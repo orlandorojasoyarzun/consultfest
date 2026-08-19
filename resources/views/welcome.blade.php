@@ -68,21 +68,21 @@
     <main class="max-w-7xl mx-auto px-8 flex-1 w-full">
         <section class="pt-24 pb-20">
             <div class="max-w-4xl">
-                <div class="inline-flex items-center gap-2 px-3 py-1 mb-8 cinema-card">
+                <div class="inline-flex items-center gap-2 px-3 py-1 mb-8 cinema-card cinema-fade-up cinema-stagger-1">
                     <div class="w-1.5 h-1.5 bg-[var(--accent)] rounded-full"></div>
                     <span class="text-xs font-medium text-[var(--text-secondary)] tracking-wide">Tracking de festivales para cineastas independientes</span>
                 </div>
 
-                <h1 class="text-5xl md:text-6xl lg:text-7xl tracking-tighter leading-[1.05] mb-6">
+                <h1 class="text-5xl md:text-6xl lg:text-7xl tracking-tighter leading-[1.05] mb-6 cinema-fade-up cinema-stagger-3">
                     <span class="font-display italic font-normal">Encuentra tu próximo</span><br>
                     <span class="font-display font-normal text-[var(--accent)]">festival</span>
                 </h1>
 
-                <p class="text-lg text-[var(--text-secondary)] max-w-2xl leading-relaxed mb-10">
+                <p class="text-lg text-[var(--text-secondary)] max-w-2xl leading-relaxed mb-10 cinema-fade-up cinema-stagger-5">
                     Inscribe tus producciones audiovisuales una vez. Te avisamos qué festivales podrían aceptarlos antes de que cierren las convocatorias.
                 </p>
 
-                <div class="flex flex-col sm:flex-row gap-3 items-start">
+                <div class="flex flex-col sm:flex-row gap-3 items-start cinema-fade-up cinema-stagger-7">
                     @if(session('subscriber_id'))
                         <a href="{{ route('dashboard') }}" class="cinema-btn inline-flex items-center gap-2 px-6 py-3.5 text-sm font-medium">
                             Ir a mi panel

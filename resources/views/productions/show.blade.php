@@ -73,7 +73,7 @@
         </div>
 
         @if($production->synopsis)
-            <div class="cinema-card p-6 mb-6">
+            <div class="cinema-card p-6 mb-6 cinema-fade-up cinema-stagger-1">
                 <div class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-3">Sinopsis</div>
                 <p class="text-sm text-[var(--text-secondary)] leading-relaxed">{{ $production->synopsis }}</p>
             </div>
@@ -81,31 +81,31 @@
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             @if($production->category)
-                <div class="cinema-card p-5">
+                <div class="cinema-card p-5 cinema-fade-up cinema-stagger-2">
                     <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">Categoría</div>
                     <div class="text-sm font-medium">{{ ucfirst(str_replace('_', ' ', $production->category)) }}</div>
                 </div>
             @endif
             @if($production->runtime_minutes)
-                <div class="cinema-card p-5">
+                <div class="cinema-card p-5 cinema-fade-up cinema-stagger-3">
                     <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">Duración</div>
                     <div class="text-sm font-medium tabular-nums">{{ $production->runtime_minutes }} min</div>
                 </div>
             @endif
             @if($production->format)
-                <div class="cinema-card p-5">
+                <div class="cinema-card p-5 cinema-fade-up cinema-stagger-4">
                     <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">Formato</div>
                     <div class="text-sm font-medium">{{ ucfirst($production->format) }}</div>
                 </div>
             @endif
             @if($production->country)
-                <div class="cinema-card p-5">
+                <div class="cinema-card p-5 cinema-fade-up cinema-stagger-5">
                     <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">País</div>
                     <div class="text-sm font-medium">{{ $production->country }}</div>
                 </div>
             @endif
             @if($production->production_year)
-                <div class="cinema-card p-5">
+                <div class="cinema-card p-5 cinema-fade-up cinema-stagger-6">
                     <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">Año</div>
                     <div class="text-sm font-medium tabular-nums">{{ $production->production_year }}</div>
                 </div>
@@ -113,7 +113,7 @@
         </div>
 
         @if($production->genres && count($production->genres) > 0)
-            <div class="cinema-card p-6 mb-6">
+            <div class="cinema-card p-6 mb-6 cinema-fade-up cinema-stagger-7">
                 <div class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-3">Géneros</div>
                 <div class="flex flex-wrap gap-2">
                     @foreach($production->genres as $genre)

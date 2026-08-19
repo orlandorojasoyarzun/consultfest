@@ -61,7 +61,7 @@
         </div>
 
         @if($festivals->isEmpty())
-            <div class="cinema-card p-12 text-center">
+            <div class="cinema-card p-12 text-center cinema-fade-up cinema-stagger-1">
                 <svg class="w-12 h-12 mx-auto mb-4 text-[var(--text-faintest)]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
                 </svg>
@@ -77,7 +77,7 @@
         @else
             <div class="space-y-3">
                 @foreach($festivals as $festival)
-                    <article class="cinema-card p-5">
+                    <article class="cinema-card p-5 cinema-fade-up" style="animation-delay: {{ min($loop->index * 80, 800) }}ms">
                         <div class="flex items-start justify-between gap-4 mb-3">
                             <div class="flex-1 min-w-0">
                                 <h2 class="text-base font-semibold tracking-tight mb-1">{{ $festival->name }}</h2>

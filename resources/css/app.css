@@ -24,7 +24,28 @@
     --color-cinema-text-mute: #737373;
     --color-cinema-gold: #d4a853;
     --color-cinema-gold-dim: #a68942;
+
+    /* Motion — easings centralizadas (cinematográficas, nunca linear) */
+    --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Motion — duración estándar en 3 escalones */
+    --duration-fast: 250ms;     /* hover, focus rings */
+    --duration-normal: 400ms;   /* cambios de estado en cards, links */
+    --duration-slow: 600ms;     /* theme switch, modal/drawer open */
 }
+
+/* ========================================
+   MOTION TOKENS - Cómo usarlos
+   ========================================
+   En blade:   class="transition-all duration-normal ease-out-soft"
+   En .css:    transition: opacity var(--duration-normal) var(--ease-out-soft);
+
+   Las tres duraciones son la escala canónica. Para algo más largo de
+   400ms, evaluar caso por caso (modales pueden ir hasta 500ms).
+
+   El view-transition de más abajo usa --expo-out (linear()) a propósito:
+   es para la Web Animations API, sistema distinto, no se unifica aquí.
+*/
 
 /* ========================================
    THEME VARIABLES - Edita aquí los colores
@@ -115,7 +136,8 @@ body {
     color: var(--text-primary);
     font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: 'cv11', 'ss01', 'ss03';
-    transition: background-color 0.4s ease, color 0.4s ease;
+    transition: background-color var(--duration-slow) var(--ease-out-soft),
+                color var(--duration-slow) var(--ease-out-soft);
 }
 
 .font-display {
@@ -130,19 +152,49 @@ body {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 0.75rem;
-    transition: border-color 0.2s ease, background-color 0.2s ease;
+    transition: border-color var(--duration-normal) var(--ease-out-soft),
+                background-color var(--duration-normal) var(--ease-out-soft);
 }
 
 .cinema-card:hover {
     border-color: var(--border-hover);
 }
 
+/* Entrance animation — fade-in + slide-up al cargar.
+   Duración larga + lift corto = sensación "suave", de respiración,
+   más cercana al pacing de cine que al de una web típica.
+   Combinable con .cinema-stagger-N para encadenar.
+   animation-fill-mode: backwards para evitar flash; después el :hover funciona normal. */
+@keyframes cinema-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cinema-fade-up {
+    animation: cinema-fade-up 1500ms var(--ease-out-soft) backwards;
+}
+
+.cinema-stagger-1 { animation-delay: 60ms; }
+.cinema-stagger-2 { animation-delay: 120ms; }
+.cinema-stagger-3 { animation-delay: 180ms; }
+.cinema-stagger-4 { animation-delay: 240ms; }
+.cinema-stagger-5 { animation-delay: 300ms; }
+.cinema-stagger-6 { animation-delay: 360ms; }
+.cinema-stagger-7 { animation-delay: 420ms; }
+.cinema-stagger-8 { animation-delay: 480ms; }
+
 .cinema-input {
     background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     border-radius: 0.5rem;
-    transition: all 0.15s ease;
+    transition: all var(--duration-fast) var(--ease-out-soft);
 }
 
 .cinema-input:focus {
@@ -171,13 +223,13 @@ body {
     color: var(--accent-text);
     font-weight: 500;
     border-radius: 0.5rem;
-    transition: all 0.15s ease;
+    transition: all var(--duration-fast) var(--ease-out-soft);
     cursor: pointer;
 }
 
 .cinema-btn:hover {
     background-color: var(--accent-hover);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
 }
 
 .cinema-btn:active {
@@ -189,7 +241,7 @@ body {
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     border-radius: 0.5rem;
-    transition: all 0.15s ease;
+    transition: all var(--duration-fast) var(--ease-out-soft);
     cursor: pointer;
 }
 
@@ -249,7 +301,7 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--duration-fast) var(--ease-out-soft);
 }
 
 .theme-toggle:hover {
