@@ -137,14 +137,13 @@
                             <a href="{{ route('productions.matches', $production) }}" class="text-xs text-[var(--accent)] hover:underline">
                                 Ver matches →
                             </a>
-                            <span class="ml-auto">
-                                <form action="{{ route('productions.destroy', $production) }}" method="POST" onsubmit="return confirm('¿Eliminar esta producción?');">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="text-xs text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors">
-                                        Eliminar
-                                    </button>
-                                </form>
-                            </span>
+                            <button
+                                type="button"
+                                onclick="Livewire.dispatch('openDeleteModal', { id: {{ $production->id }} })"
+                                class="ml-auto text-xs text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
+                            >
+                                Eliminar
+                            </button>
                         </div>
                     </article>
                 @endforeach
@@ -158,5 +157,13 @@
             <p class="text-xs text-[var(--text-faint)]">Para cineastas independientes</p>
         </div>
     </footer>
+
+    {{-- Delete-production confirmation modal — global to this page so
+         every card's Eliminar button can dispatch into it. State lives
+         on the DeleteProductionModal Livewire component; the buttons
+         above just dispatch `openDeleteModal` via vanilla JS. --}}
+    <livewire:delete-production-modal />
+
+    @livewireScripts
 </body>
 </html>

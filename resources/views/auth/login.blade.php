@@ -60,10 +60,10 @@
     <main class="flex-1 flex items-center justify-center px-6 py-12">
         <div class="w-full max-w-md">
             <div class="text-center mb-10">
-                <h1 class="text-3xl md:text-4xl font-semibold tracking-tight mb-3">
+                <h1 class="text-3xl md:text-4xl font-semibold tracking-tight mb-3 cinema-fade-up cinema-stagger-1">
                     <span class="font-display italic font-normal">Inicia sesión</span>
                 </h1>
-                <p class="text-sm text-[var(--text-muted)]">
+                <p class="text-sm text-[var(--text-muted)] cinema-fade-up cinema-stagger-2">
                     Accede a tu panel para gestionar tus producciones y suscripciones.
                 </p>
             </div>
@@ -84,7 +84,7 @@
                 </div>
             @endif
 
-            <a href="{{ route('auth.google') }}" class="cinema-btn w-full inline-flex items-center justify-center gap-3 px-6 py-3.5 text-sm font-medium">
+            <a href="{{ route('auth.google') }}" target="_blank" rel="noopener noreferrer" class="cinema-btn w-full inline-flex items-center justify-center gap-3 px-6 py-3.5 text-sm font-medium cinema-fade-up cinema-stagger-3">
                 <svg class="w-4 h-4" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                     <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
                     <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
@@ -100,7 +100,7 @@
                 <div class="flex-1 h-px bg-[var(--border-color)]"></div>
             </div>
 
-            <form action="{{ route('auth.login.process') }}" method="POST" class="space-y-4">
+            <form action="{{ route('auth.login.process') }}" method="POST" class="space-y-4 cinema-fade-up cinema-stagger-5">
                 @csrf
 
                 <div>
@@ -143,7 +143,7 @@
                 </button>
             </form>
 
-            <p class="text-center text-sm text-[var(--text-muted)] mt-8">
+            <p class="text-center text-sm text-[var(--text-muted)] mt-8 cinema-fade-up cinema-stagger-7">
                 ¿No tienes cuenta?
                 <a href="{{ route('auth.register') }}" class="text-[var(--accent)] hover:underline transition-colors font-medium">Crea una →</a>
             </p>

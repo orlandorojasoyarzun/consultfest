@@ -129,13 +129,13 @@
             <a href="{{ route('productions.edit', $production) }}" class="cinema-btn px-6 py-2.5 text-sm">
                 Editar
             </a>
-            <form action="{{ route('productions.destroy', $production) }}" method="POST" class="ml-auto"
-                onsubmit="return confirm('¿Eliminar esta producción? No se puede deshacer.');">
-                @csrf @method('DELETE')
-                <button type="submit" class="text-sm text-[var(--danger)] hover:underline">
-                    Eliminar
-                </button>
-            </form>
+            <button
+                type="button"
+                onclick="Livewire.dispatch('openDeleteModal', { id: {{ $production->id }} })"
+                class="ml-auto text-sm text-[var(--danger)] hover:underline transition-colors"
+            >
+                Eliminar
+            </button>
         </div>
     </main>
 
@@ -145,5 +145,12 @@
             <p class="text-xs text-[var(--text-faint)]">Para cineastas independientes</p>
         </div>
     </footer>
+
+    {{-- Delete-production confirmation modal — same component used by
+         productions/index.blade.php so the Eliminar button on the
+         detail page dispatches into the same dialog. --}}
+    <livewire:delete-production-modal />
+
+    @livewireScripts
 </body>
 </html>

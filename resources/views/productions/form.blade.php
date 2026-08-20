@@ -50,7 +50,7 @@
     </nav>
 
     <main class="max-w-3xl mx-auto px-8 pt-12 pb-24 flex-1 w-full">
-        <h1 class="text-3xl md:text-4xl font-semibold tracking-tight mb-8">
+        <h1 class="text-3xl md:text-4xl font-semibold tracking-tight mb-8 cinema-fade-up cinema-stagger-1">
             {{ $production->exists ? 'Editar producción' : 'Nueva producción' }}
         </h1>
 
@@ -68,7 +68,7 @@
             @csrf
             @if($production->exists) @method('PUT') @endif
 
-            <div class="cinema-card p-6">
+            <div class="cinema-card p-6 cinema-fade-up cinema-stagger-2">
                 <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">
                     Título <span class="text-[var(--danger)]">*</span>
                 </label>
@@ -76,14 +76,14 @@
                     class="cinema-input w-full px-4 py-2.5 text-sm @error('title') cinema-input-error @enderror">
             </div>
 
-            <div class="cinema-card p-6">
+            <div class="cinema-card p-6 cinema-fade-up cinema-stagger-3">
                 <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Sinopsis</label>
                 <textarea name="synopsis" rows="4" maxlength="5000"
                     class="cinema-input w-full px-4 py-2.5 text-sm">{{ old('synopsis', $production->synopsis) }}</textarea>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="cinema-card p-6">
+                <div class="cinema-card p-6 cinema-fade-up cinema-stagger-4">
                     <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Categoría</label>
                     <select name="category" class="cinema-input w-full px-4 py-2.5 text-sm">
                         <option value="">— Ninguna —</option>
@@ -95,13 +95,13 @@
                     </select>
                 </div>
 
-                <div class="cinema-card p-6">
+                <div class="cinema-card p-6 cinema-fade-up cinema-stagger-5">
                     <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Duración (min)</label>
                     <input type="number" name="runtime_minutes" value="{{ old('runtime_minutes', $production->runtime_minutes) }}"
                         min="1" max="600" class="cinema-input w-full px-4 py-2.5 text-sm tabular-nums">
                 </div>
 
-                <div class="cinema-card p-6">
+                <div class="cinema-card p-6 cinema-fade-up cinema-stagger-6">
                     <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Formato</label>
                     <select name="format" class="cinema-input w-full px-4 py-2.5 text-sm">
                         <option value="">—</option>
@@ -115,13 +115,13 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="cinema-card p-6">
+                <div class="cinema-card p-6 cinema-fade-up cinema-stagger-7">
                     <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">País</label>
                     <input type="text" name="country" value="{{ old('country', $production->country) }}" maxlength="255"
                         class="cinema-input w-full px-4 py-2.5 text-sm">
                 </div>
 
-                <div class="cinema-card p-6">
+                <div class="cinema-card p-6 cinema-fade-up cinema-stagger-8">
                     <label class="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-2">Estado de la producción</label>
                     <select name="status" class="cinema-input w-full px-4 py-2.5 text-sm">
                         @foreach(['draft', 'active', 'archived'] as $st)
@@ -147,7 +147,7 @@
                  before, but the UI no longer asks for it. Re-enable by
                  pasting back the cinema-card block. --}}
 
-            <div class="flex items-center gap-3 pt-2">
+            <div class="flex items-center gap-3 pt-2 cinema-fade-up cinema-stagger-8">
                 <button type="submit" class="cinema-btn px-6 py-3 text-sm">
                     {{ $production->exists ? 'Guardar cambios' : 'Crear producción' }}
                 </button>

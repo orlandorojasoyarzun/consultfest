@@ -166,14 +166,13 @@
                             <a href="{{ route('festivals.redirect', ['apiId' => $festival->apiId]) }}" target="_blank" rel="noopener" class="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
                                 Ver sitio del festival →
                             </a>
-                            <form action="{{ route('festivals.subscribe') }}" method="POST" class="ml-auto">
-                                @csrf
-                                <input type="hidden" name="festival_api_id" value="{{ $festival->apiId }}">
-                                <input type="hidden" name="notification_type" value="both">
-                                <button type="submit" class="cinema-btn px-4 py-2 text-xs">
-                                    + Suscribirme
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                onclick="Livewire.dispatch('openSubscribeModal', { apiId: {{ $festival->apiId }} })"
+                                class="ml-auto cinema-btn px-4 py-2 text-xs"
+                            >
+                                + Suscribirme
+                            </button>
                         </div>
                     </article>
                 @endforeach
@@ -223,5 +222,13 @@
             <p class="text-xs text-[var(--text-faint)]">Para cineastas independientes</p>
         </div>
     </footer>
+
+    {{-- Subscribe modal — same component used by /festivals so the
+         match-page Suscribirme button gets the full preview + email
+         confirmation flow. festivalNames is populated by the controller
+         so the modal title shows up instantly without a round-trip. --}}
+    <livewire:festival-subscribe-modal :festival-names="$festivalNames" />
+
+    @livewireScripts
 </body>
 </html>
