@@ -150,6 +150,7 @@ class ProductionController extends Controller
         return view('productions.matches', [
             'production' => $production,
             'festivals' => $festivals,
+            'festivalNames' => $festivals->pluck('name', 'apiId')->all(),
             'currentPage' => $page,
             'totalPages' => $totalPages,
             'totalMatches' => $total,
