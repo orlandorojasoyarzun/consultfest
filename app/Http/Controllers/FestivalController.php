@@ -4,9 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Data\FestivalData;
 use App\Models\Festival;
-use App\Models\Subscriber;
-use App\Models\Subscription;
-use App\Notifications\FestivalUnsubscribedNotification;
 use App\Services\FestivalApiService;
 use App\Services\FestivalSearchService;
 use App\Services\FestivalSubscriptionService;
@@ -178,37 +175,40 @@ class FestivalController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function unsubscribe(int $festivalApiId): JsonResponse
+    /**
+     * Unsubscribe the current subscriber from a festival.
+     *
+     * Returns JSON for fetch callers (Livewire modal — though the modal
+     * uses the service directly) and a redirect-back for plain HTML form
+     * submissions (the /festivals/{id} show page still uses a form).
+     * Before this split the controller always returned JsonResponse, which
+     * dumped raw `{"success":true}` into the browser when a form on
+     * /festivals/{id} submitted — the user saw a blank JSON page instead
+     * of landing back on the page they were reading. Same controller, two
+     * response shapes, decided by Accept header.
+     *
+     * The actual unsubscribe logic lives in FestivalSubscriptionService so
+     * it can be shared with the UnsubscribeFestivalModal Livewire
+     * component without an Http::post() loopback (which deadlocks the PHP
+     * session lock for 30s+ — same trap subscribe() fell into earlier).
+     */
+    public function unsubscribe(Request $request, int $festivalApiId): JsonResponse | \Illuminate\Http\RedirectResponse
     {
         $subscriberId = session('subscriber_id');
 
         if (!$subscriberId) {
-            return response()->json(['error' => 'Not registered'], 401);
+            if ($request->wantsJson()) {
+                return response()->json(['error' => 'Not registered'], 401);
+            }
+            return redirect()->route('auth.login');
         }
 
-        $festival = Festival::where('api_id', $festivalApiId)->first();
+        $result = $this->subscriptionService->unsubscribe($subscriberId, $festivalApiId);
 
-        // If the festival isn't in our local DB, the user can't possibly be
-        // subscribed to it. Return success idempotently — no email, no error.
-        if (!$festival) {
+        if ($request->wantsJson()) {
             return response()->json(['success' => true]);
         }
-
-        // Only send confirmation email if there WAS a subscription to
-        // remove. Idempotent endpoint shouldn't spam users when they
-        // hit unsubscribe for a festival they never subscribed to.
-        $deleted = Subscription::where('subscriber_id', $subscriberId)
-            ->where('festival_id', $festival->id)
-            ->delete();
-
-        if ($deleted > 0) {
-            $subscriber = Subscriber::find($subscriberId);
-            if ($subscriber) {
-                $this->notifications->safeNotify($subscriber, new FestivalUnsubscribedNotification($festival));
-            }
-        }
-
-        return response()->json(['success' => true]);
+        return back()->with('auth-flash', $result->message);
     }
 
     public function logout(): JsonResponse

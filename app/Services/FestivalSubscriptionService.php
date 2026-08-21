@@ -6,6 +6,7 @@ use App\Models\Festival;
 use App\Models\Subscriber;
 use App\Models\Subscription;
 use App\Notifications\FestivalSubscribedNotification;
+use App\Notifications\FestivalUnsubscribedNotification;
 
 /**
  * Subscribe / unsubscribe a subscriber to a festival.
@@ -16,6 +17,10 @@ use App\Notifications\FestivalSubscribedNotification;
  * was calling the controller via Http::post() loopback, which deadlocks
  * the PHP session lock for up to max_execution_time (30s+). Calling the
  * logic directly through this service avoids the round-trip entirely.
+ *
+ * Same reason for unsubscribe(): the Livewire UnsubscribeFestivalModal
+ * shares this path with FestivalController::unsubscribe so both
+ * entrypoints delete the same row and fire the same notification.
  */
 class FestivalSubscriptionService
 {
@@ -69,5 +74,44 @@ class FestivalSubscriptionService
         }
 
         return SubscribeResult::success();
+    }
+
+    /**
+     * Idempotent unsubscribe. If the festival isn't in the local DB the
+     * user can't possibly be subscribed — return success without
+     * notifying. If a subscription row exists, delete it and send the
+     * unsubscribe email only when there was something to remove (an
+     * idempotent endpoint shouldn't spam a user who hit unsubscribe for
+     * a festival they were never on).
+     *
+     * Returns true iff a row was actually deleted. The HTTP and Livewire
+     * callers use this to decide whether to flash a "Te desuscribiste"
+     * message vs. a quieter "No estabas suscrito".
+     */
+    public function unsubscribe(int $subscriberId, int $festivalApiId): UnsubscribeResult
+    {
+        $festival = Festival::where('api_id', $festivalApiId)->first();
+
+        if (!$festival) {
+            return UnsubscribeResult::noop('Ese festival no está en nuestro catálogo — no estabas suscrito.');
+        }
+
+        $deleted = Subscription::where('subscriber_id', $subscriberId)
+            ->where('festival_id', $festival->id)
+            ->delete();
+
+        if ($deleted === 0) {
+            return UnsubscribeResult::noop('No estabas suscrito a ' . $festival->name . '.');
+        }
+
+        $subscriber = Subscriber::find($subscriberId);
+        if ($subscriber) {
+            $this->notifications->safeNotify(
+                $subscriber,
+                new FestivalUnsubscribedNotification($festival),
+            );
+        }
+
+        return UnsubscribeResult::deleted($festival->name);
     }
 }
