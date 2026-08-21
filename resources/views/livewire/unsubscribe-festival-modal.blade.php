@@ -98,8 +98,6 @@
      `listen2()` attaches `$listeners` entries. --}}
 <script>
     document.addEventListener('livewire:init', () => {
-        console.log('[ufm-script] livewire:init received — modal script is live');
-
         // ─── BACKDROP-CLICK HANDLER ────────────────────────────────────────
         // Bound once on the <dialog>. Only fires on backdrop clicks
         // (target === dialog) and swallows the very first such click after
@@ -131,13 +129,10 @@
             const state = component.snapshot?.data?.unsubscribeModalOpen;
             if (state === undefined) return;
             const dialog = document.getElementById(DIALOG_ID);
-            if (!dialog) { console.warn('[ufm] dialog missing'); return; }
-
-            console.log('[ufm] morph.updated state=' + state + ' dialog.open=' + dialog.open + ' _dialogOpening=' + !!dialog._dialogOpening);
+            if (!dialog) return;
 
             if (!dialog._backdropClickBound) {
                 dialog.addEventListener('click', (e) => {
-                    console.log('[ufm] dialog click target=' + (e.target === dialog ? 'dialog(backdrop)' : 'inner') + ' suppress=' + !!dialog._suppressNextBackdropClick + ' opening=' + !!dialog._dialogOpening);
                     if (e.target !== dialog) return;
                     if (dialog._suppressNextBackdropClick) {
                         dialog._suppressNextBackdropClick = false;
@@ -153,13 +148,11 @@
                 if (!dialog.open) {
                     dialog._dialogOpening = true;
                     dialog._suppressNextBackdropClick = true;
-                    console.log('[ufm] showModal()');
                     dialog.showModal();
                     setTimeout(() => {
                         dialog._dialogOpening = false;
                         if (!dialog._closeListenerBound) {
                             document.addEventListener('close', (e) => {
-                                console.log('[ufm] close event target.id=' + (e.target && e.target.id) + ' opening=' + !!e.target._dialogOpening);
                                 if (!e.target || e.target.id !== DIALOG_ID) return;
                                 const root = e.target.closest('[wire\\:id]');
                                 if (root && !e.target._dialogOpening) {
@@ -172,7 +165,7 @@
                 }
             } else {
                 if (dialog._dialogOpening) return;
-                if (dialog.open) { console.log('[ufm] dialog.close() (state=false)'); dialog.close(); }
+                if (dialog.open) dialog.close();
             }
         });
     });
