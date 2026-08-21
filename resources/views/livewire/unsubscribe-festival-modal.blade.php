@@ -19,13 +19,13 @@
         id="unsubscribe-festival-modal"
         class="bg-transparent p-0"
         style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
-        wire:click.self="closeUnsubscribeModal"
+        onclick="if(event.target===this)livewireFire('unsubscribe-festival-modal','closeUnsubscribeModal')"
     >
         <style>[open]#unsubscribe-festival-modal{background:transparent;border:0;box-shadow:none;outline:0;padding:0;color-scheme:dark}[open]#unsubscribe-festival-modal::backdrop{background-color:rgba(0,0,0,.6);backdrop-filter:blur(4px)}@keyframes ufm-in{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}[open]#unsubscribe-festival-modal .cinema-card{animation:ufm-in 220ms cubic-bezier(.2,.7,.2,1) both}</style>
         <div
             class="cinema-card w-full max-h-[90vh] overflow-y-auto px-14 sm:px-20 py-20 sm:py-24 relative text-center"
             style="border-radius: 0.75rem;"
-            wire:click.stop
+            onclick="event.stopPropagation()"
             role="dialog"
             aria-modal="true"
             aria-labelledby="unsubscribe-festival-modal-title"
@@ -58,14 +58,14 @@
             <div class="flex items-center justify-center gap-4 mt-44 sm:mt-56">
                 <button
                     type="button"
-                    wire:click="closeUnsubscribeModal"
+                    onclick="livewireFire('unsubscribe-festival-modal','closeUnsubscribeModal')"
                     class="cinema-btn-outline px-6 py-2.5 text-sm"
                 >
                     Cancelar
                 </button>
                 <button
                     type="button"
-                    wire:click="confirmUnsubscribe"
+                    onclick="livewireFire('unsubscribe-festival-modal','confirmUnsubscribe')"
                     wire:loading.attr="disabled"
                     wire:target="confirmUnsubscribe"
                     @disabled($isProcessing)

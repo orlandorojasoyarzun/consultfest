@@ -88,6 +88,18 @@ class FestivalResults extends Component
 
     protected $listeners = [
         'search-festivals' => 'search',
+        // The subscribe modal that lives inside this component's view
+        // (id="subscribe-modal") opens with `wire:click` on the row card
+        // — that works because the row is outside the <dialog>. The
+        // modal's action buttons (Cancelar / Confirmar / Cerrar / dismiss
+        // success toast) sit inside the <dialog>, where `wire:click` is
+        // unreliable under Livewire v4 + Alpine in production (the dialog
+        // enters the top layer). Route them through the same dispatch
+        // path the search form uses so a single code path covers both
+        // sibling and same-component dispatches.
+        'closeSubscribeModal' => 'closeSubscribeModal',
+        'confirmSubscribe' => 'confirmSubscribe',
+        'dismissSubscribeSuccess' => 'dismissSubscribeSuccess',
     ];
 
     public function boot(
