@@ -71,6 +71,16 @@ class FestivalSubscribeModal extends Component
 
     protected $listeners = [
         'openSubscribeModal' => 'openSubscribeModal',
+        // See UnsubscribeFestivalModal — same reason. The action buttons
+        // (Cancelar / Confirmar suscripción / Cerrar error / dismiss
+        // success toast) live inside a native <dialog> opened with
+        // `showModal()`, and `wire:click` is unreliable there under
+        // Livewire v4 + Alpine in production. Route them through the
+        // same `livewireFire` helper the row button uses to OPEN the
+        // modal so dispatch and listener share one code path.
+        'closeSubscribeModal' => 'closeSubscribeModal',
+        'confirmSubscribe' => 'confirmSubscribe',
+        'dismissSubscribeSuccess' => 'dismissSubscribeSuccess',
     ];
 
     public function boot(

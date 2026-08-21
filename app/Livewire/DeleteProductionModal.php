@@ -49,6 +49,15 @@ class DeleteProductionModal extends Component
 
     protected $listeners = [
         'openDeleteModal' => 'openDeleteModal',
+        // See UnsubscribeFestivalModal — same reason: `wire:click` on
+        // elements inside a native `<dialog>` opened with `showModal()`
+        // doesn't fire reliably under Livewire v4 with Alpine in
+        // production (the dialog enters the top layer). The row button
+        // that opens the modal works because it dispatches via the
+        // `livewireFire` helper; we route the action buttons through
+        // the same path so the snapshot stays in sync.
+        'closeDeleteModal' => 'closeDeleteModal',
+        'confirmDelete' => 'confirmDelete',
     ];
 
     /**

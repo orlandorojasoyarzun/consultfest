@@ -24,7 +24,7 @@
             </div>
             <button
                 type="button"
-                wire:click="dismissSubscribeSuccess"
+                onclick="livewireFire('festival-subscribe-modal','dismissSubscribeSuccess')"
                 class="text-[var(--text-faintest)] hover:text-[var(--text-secondary)] transition-colors shrink-0"
                 aria-label="Cerrar"
             >
@@ -43,13 +43,13 @@
         id="festival-subscribe-modal"
         class="bg-transparent p-0"
         style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
-        wire:click.self="closeSubscribeModal"
+        onclick="if(event.target===this)livewireFire('festival-subscribe-modal','closeSubscribeModal')"
     >
         <style>[open]#festival-subscribe-modal{background:transparent;border:0;box-shadow:none;outline:0;padding:0;color-scheme:dark}[open]#festival-subscribe-modal::backdrop{background-color:rgba(0,0,0,.6);backdrop-filter:blur(4px)}</style>
         <div
             class="cinema-card w-full max-h-[90vh] overflow-y-auto p-7 relative"
             style="border-radius: 0.75rem;"
-            wire:click.stop
+            onclick="event.stopPropagation()"
             role="dialog"
             aria-modal="true"
             aria-labelledby="festival-subscribe-modal-title"
@@ -73,7 +73,7 @@
                         <p class="mt-2 text-sm text-[var(--text-muted)]">{{ $subscribeError }}</p>
                         <button
                             type="button"
-                            wire:click="closeSubscribeModal"
+                            onclick="livewireFire('festival-subscribe-modal','closeSubscribeModal')"
                             class="mt-6 cinema-btn-outline px-4 py-2 text-sm"
                         >
                             Cerrar
@@ -228,14 +228,14 @@
                     <div class="flex items-center justify-end gap-3">
                         <button
                             type="button"
-                            wire:click="closeSubscribeModal"
+                            onclick="livewireFire('festival-subscribe-modal','closeSubscribeModal')"
                             class="cinema-btn-outline px-4 py-2 text-sm"
                         >
                             Cancelar
                         </button>
                         <button
                             type="button"
-                            wire:click="confirmSubscribe"
+                            onclick="livewireFire('festival-subscribe-modal','confirmSubscribe')"
                             wire:loading.attr="disabled"
                             wire:target="confirmSubscribe"
                             @disabled(!$subscribeSubscriberLoggedIn || !$subscribeEmailConfirmed)

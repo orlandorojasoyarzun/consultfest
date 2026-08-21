@@ -60,6 +60,17 @@ class UnsubscribeFestivalModal extends Component
 
     protected $listeners = [
         'openUnsubscribeModal' => 'openUnsubscribeModal',
+        // Register the modal's own action methods as listeners too, so the
+        // Confirmar / Cancelar buttons can dispatch them via the same
+        // `livewireFire()` helper the row uses to OPEN the modal. `wire:click`
+        // on elements inside a `<dialog>` opened with `showModal()` is
+        // unreliable in Livewire v4 with Alpine — the dialog enters the
+        // browser's top layer and Alpine's `@click` binding doesn't fire
+        // consistently there. `livewireFire` dispatches a CustomEvent on the
+        // component's root `<div>` (NOT on the dialog), which `listen2()`
+        // catches regardless of where the trigger element lives.
+        'closeUnsubscribeModal' => 'closeUnsubscribeModal',
+        'confirmUnsubscribe' => 'confirmUnsubscribe',
     ];
 
     /**
