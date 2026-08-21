@@ -227,6 +227,7 @@
          class from a click handler were undone by morphdom reapplying
          `hidden` on the next request. --}}
     <dialog
+        wire:ignore.self
         id="subscribe-modal"
         class="bg-transparent p-0"
         style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
@@ -455,13 +456,13 @@
      `showModal()` and hidden via `close()` from the morph.updated hook.
 
      Backdrop-click handler is bound once on the <dialog> (not inline)
-     and uses a one-shot flag instead of the previous 80 ms
-     `setTimeout` guard — the time-based guard was racy because Safari
-     fires a synthetic `isTrusted=true` click on the dialog right after
-     showModal(), and if it lands after the timer clears the modal
-     auto-closes itself ("open and immediately close" bug). Same
-     one-shot pattern used by the standalone subscribe / unsubscribe /
-     delete modals. --}}
+     and uses a one-shot flag plus a 250 ms `_dialogOpening` window to
+     refuse any close dispatch during the open transition. The native
+     `close` listener is intentionally NOT registered here (and isn't
+     needed — Cancelar and the confirm button both call
+     `closeSubscribeModal` directly via `livewireFire`). This is the
+     same race-free pattern the standalone subscribe / unsubscribe /
+     delete modals use. --}}
 <script>
     document.addEventListener('livewire:init', () => {
         Livewire.hook('morph.updated', ({ el, component }) => {
@@ -472,17 +473,12 @@
 
             if (!modal._backdropClickBound) {
                 modal.addEventListener('click', (e) => {
-                    // Clicks on the inner `.cinema-card` bubble up here, but
-                    // their `target` is the inner element — only clicks that
-                    // landed on the dialog itself (i.e. on the backdrop) have
-                    // `target === modal`.
                     if (e.target !== modal) return;
-                    // One-shot: swallow the synthetic click showModal() emits
-                    // on Safari/Firefox so the modal doesn't auto-close.
                     if (modal._suppressNextBackdropClick) {
                         modal._suppressNextBackdropClick = false;
                         return;
                     }
+                    if (modal._dialogOpening) return;
                     livewireFire('festival-results', 'closeSubscribeModal');
                 });
                 modal._backdropClickBound = true;
@@ -490,10 +486,13 @@
 
             if (state === true) {
                 if (!modal.open) {
+                    modal._dialogOpening = true;
                     modal._suppressNextBackdropClick = true;
                     modal.showModal();
+                    setTimeout(() => { modal._dialogOpening = false; }, 250);
                 }
             } else {
+                if (modal._dialogOpening) return;
                 if (modal.open) modal.close();
             }
         });

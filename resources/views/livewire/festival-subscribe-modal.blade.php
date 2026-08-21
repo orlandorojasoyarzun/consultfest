@@ -40,6 +40,7 @@
          ancestor uses transform/filter/backdrop-filter. Visibility is
          toggled by a Livewire.hook at the bottom of this file. --}}
     <dialog
+        wire:ignore.self
         id="festival-subscribe-modal"
         class="bg-transparent p-0"
         style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
@@ -263,68 +264,70 @@
      next request. --}}
 <script>
     document.addEventListener('livewire:init', () => {
-        // Backdrop-click handler — bound once on the <dialog> element.
+        // ─── BACKDROP-CLICK HANDLER ────────────────────────────────────────
+        // Bound once on the <dialog>. Only fires on backdrop clicks
+        // (target === dialog) and swallows the very first such click after
+        // showModal() — that's the synthetic isTrusted=true click some
+        // browsers (Safari, sometimes Firefox) emit when showModal() runs.
+        // `_dialogOpening` is a belt-and-braces guard that stays true for
+        // 250ms after open, so even a late-arriving synthetic click is
+        // ignored while the modal is settling.
         //
-        // Earlier versions used an inline `onclick` attribute combined with
-        // a `setTimeout(..., 80)` guard to swallow the synthetic click that
-        // browsers (notably Safari) fire on the <dialog> right after
-        // showModal(). The 80 ms window is racy: if the synthetic click
-        // lands after the timer clears, `event.target === this`,
-        // `event.isTrusted === true` and the modal closes itself instantly
-        // ("open and immediately close" bug).
-        //
-        // Fix: drop the time-based guard entirely. Use a one-shot flag
-        // (`_suppressNextBackdropClick`) that the very first click on the
-        // dialog consumes — regardless of when it arrives. The dialog is
-        // not morphed by morphdom (morphdom only touches attributes/children
-        // of the root), so this listener survives subsequent morph cycles;
-        // `_backdropClickBound` makes re-attachment idempotent across
-        // SPA navigations where the whole script re-runs.
+        // We do NOT register the `close` listener until the opening
+        // transition is over. Earlier versions attached it eagerly, and that
+        // was the second root cause of the "open and immediately close"
+        // bug: the close listener dispatched `closeSubscribeModal`
+        // server-side, which flipped state to false, which the next morph
+        // cycle rendered as `dialog.close()` — racing with the still-
+        // settling modal and yanking it shut before the user could see it.
+        // The 250ms delay is harmless (ESC fires well after that) and lets
+        // us avoid the race entirely.
+
+        const DIALOG_ID = 'festival-subscribe-modal';
+        const COMPONENT_NAME = 'festival-subscribe-modal';
+
         Livewire.hook('morph.updated', ({ el, component }) => {
             const state = component.snapshot?.data?.subscribeModalOpen;
             if (state === undefined) return;
-            const dialog = document.getElementById('festival-subscribe-modal');
+            const dialog = document.getElementById(DIALOG_ID);
             if (!dialog) return;
 
             if (!dialog._backdropClickBound) {
                 dialog.addEventListener('click', (e) => {
-                    // Clicks on the inner `.cinema-card` bubble up here, but
-                    // their `target` is the inner element — only clicks that
-                    // landed on the dialog itself (i.e. on the backdrop) have
-                    // `target === dialog`.
                     if (e.target !== dialog) return;
-                    // One-shot: swallow the synthetic click showModal() emits
-                    // on Safari/Firefox so the modal doesn't auto-close.
                     if (dialog._suppressNextBackdropClick) {
                         dialog._suppressNextBackdropClick = false;
                         return;
                     }
-                    livewireFire('festival-subscribe-modal', 'closeSubscribeModal');
+                    if (dialog._dialogOpening) return;
+                    livewireFire(COMPONENT_NAME, 'closeSubscribeModal');
                 });
                 dialog._backdropClickBound = true;
             }
 
             if (state === true) {
                 if (!dialog.open) {
+                    dialog._dialogOpening = true;
                     dialog._suppressNextBackdropClick = true;
                     dialog.showModal();
+                    setTimeout(() => {
+                        dialog._dialogOpening = false;
+                        if (!dialog._closeListenerBound) {
+                            document.addEventListener('close', (e) => {
+                                if (!e.target || e.target.id !== DIALOG_ID) return;
+                                const root = e.target.closest('[wire\\:id]');
+                                if (root && !e.target._dialogOpening) {
+                                    root.dispatchEvent(new CustomEvent('closeSubscribeModal', { bubbles: true }));
+                                }
+                            }, true);
+                            dialog._closeListenerBound = true;
+                        }
+                    }, 250);
                 }
             } else {
+                if (dialog._dialogOpening) return;
                 if (dialog.open) dialog.close();
             }
         });
-
-        // ESC closes the native <dialog> automatically; sync the Livewire
-        // state so the next morph cycle doesn't reopen the dialog.
-        // Dispatch closeSubscribeModal on this component's root element
-        // (closest [wire\\:id]) — that's where Livewire v4's `listen2()`
-        // attaches `$listeners` entries.
-        document.addEventListener('close', (e) => {
-            if (!e.target || e.target.id !== 'festival-subscribe-modal') return;
-            const root = e.target.closest('[wire\\:id]');
-            if (root) {
-                root.dispatchEvent(new CustomEvent('closeSubscribeModal', { bubbles: true }));
-            }
-        }, true);
     });
 </script>
