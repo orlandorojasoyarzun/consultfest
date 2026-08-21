@@ -230,7 +230,6 @@
         id="subscribe-modal"
         class="bg-transparent p-0"
         style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
-        onclick="if(event.target===this && event.isTrusted && !this._ignoreNextClick)livewireFire('festival-results','closeSubscribeModal')"
     >
         <style>[open]#subscribe-modal{background:transparent;border:0;box-shadow:none;outline:0;padding:0;color-scheme:dark}[open]#subscribe-modal::backdrop{background-color:rgba(0,0,0,.6);backdrop-filter:blur(4px)}</style>
         <div
@@ -453,7 +452,16 @@
      inset: 0` — that's what was happening: the modal was being rendered
      at `top: 3124` because an ancestor in the Livewire component chain
      had a transform-style utility). The dialog is shown via
-     `showModal()` and hidden via `close()` from the morph.updated hook. --}}
+     `showModal()` and hidden via `close()` from the morph.updated hook.
+
+     Backdrop-click handler is bound once on the <dialog> (not inline)
+     and uses a one-shot flag instead of the previous 80 ms
+     `setTimeout` guard — the time-based guard was racy because Safari
+     fires a synthetic `isTrusted=true` click on the dialog right after
+     showModal(), and if it lands after the timer clears the modal
+     auto-closes itself ("open and immediately close" bug). Same
+     one-shot pattern used by the standalone subscribe / unsubscribe /
+     delete modals. --}}
 <script>
     document.addEventListener('livewire:init', () => {
         Livewire.hook('morph.updated', ({ el, component }) => {
@@ -461,15 +469,29 @@
             if (state === undefined) return;
             const modal = document.getElementById('subscribe-modal');
             if (!modal) return;
+
+            if (!modal._backdropClickBound) {
+                modal.addEventListener('click', (e) => {
+                    // Clicks on the inner `.cinema-card` bubble up here, but
+                    // their `target` is the inner element — only clicks that
+                    // landed on the dialog itself (i.e. on the backdrop) have
+                    // `target === modal`.
+                    if (e.target !== modal) return;
+                    // One-shot: swallow the synthetic click showModal() emits
+                    // on Safari/Firefox so the modal doesn't auto-close.
+                    if (modal._suppressNextBackdropClick) {
+                        modal._suppressNextBackdropClick = false;
+                        return;
+                    }
+                    livewireFire('festival-results', 'closeSubscribeModal');
+                });
+                modal._backdropClickBound = true;
+            }
+
             if (state === true) {
                 if (!modal.open) {
-                    // Some browsers fire a click on the <dialog> during
-                    // showModal() — synthetic, but with isTrusted=true on
-                    // Safari. Block backdrop-close for a beat so the click
-                    // doesn't auto-dismiss the modal that just opened.
-                    modal._ignoreNextClick = true;
+                    modal._suppressNextBackdropClick = true;
                     modal.showModal();
-                    setTimeout(() => { modal._ignoreNextClick = false; }, 80);
                 }
             } else {
                 if (modal.open) modal.close();

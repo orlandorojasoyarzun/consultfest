@@ -13,7 +13,6 @@
         id="delete-production-modal"
         class="bg-transparent p-0"
         style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
-        onclick="if(event.target===this && event.isTrusted && !this._ignoreNextClick)livewireFire('delete-production-modal','closeDeleteModal')"
     >
         <style>[open]#delete-production-modal{background:transparent;border:0;box-shadow:none;outline:0;padding:0;color-scheme:dark}[open]#delete-production-modal::backdrop{background-color:rgba(0,0,0,.6);backdrop-filter:blur(4px)}@keyframes dpm-in{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}[open]#delete-production-modal .cinema-card{animation:dpm-in 220ms cubic-bezier(.2,.7,.2,1) both}</style>
         <div
@@ -99,20 +98,51 @@
      component and doesn't fight with other Livewire state. --}}
 <script>
     document.addEventListener('livewire:init', () => {
+        // Backdrop-click handler — bound once on the <dialog> element.
+        //
+        // Earlier versions used an inline `onclick` attribute combined with
+        // a `setTimeout(..., 80)` guard to swallow the synthetic click that
+        // browsers (notably Safari) fire on the <dialog> right after
+        // showModal(). The 80 ms window is racy: if the synthetic click
+        // lands after the timer clears, `event.target === this`,
+        // `event.isTrusted === true` and the modal closes itself instantly
+        // ("open and immediately close" bug).
+        //
+        // Fix: drop the time-based guard entirely. Use a one-shot flag
+        // (`_suppressNextBackdropClick`) that the very first click on the
+        // dialog consumes — regardless of when it arrives. The dialog is
+        // not morphed by morphdom (morphdom only touches attributes/children
+        // of the root), so this listener survives subsequent morph cycles;
+        // `_backdropClickBound` makes re-attachment idempotent across
+        // SPA navigations where the whole script re-runs.
         Livewire.hook('morph.updated', ({ el, component }) => {
             const state = component.snapshot?.data?.deleteModalOpen;
             if (state === undefined) return;
             const dialog = document.getElementById('delete-production-modal');
             if (!dialog) return;
+
+            if (!dialog._backdropClickBound) {
+                dialog.addEventListener('click', (e) => {
+                    // Clicks on the inner `.cinema-card` bubble up here, but
+                    // their `target` is the inner element — only clicks that
+                    // landed on the dialog itself (i.e. on the backdrop) have
+                    // `target === dialog`.
+                    if (e.target !== dialog) return;
+                    // One-shot: swallow the synthetic click showModal() emits
+                    // on Safari/Firefox so the modal doesn't auto-close.
+                    if (dialog._suppressNextBackdropClick) {
+                        dialog._suppressNextBackdropClick = false;
+                        return;
+                    }
+                    livewireFire('delete-production-modal', 'closeDeleteModal');
+                });
+                dialog._backdropClickBound = true;
+            }
+
             if (state === true) {
                 if (!dialog.open) {
-                    // Some browsers fire a click on the <dialog> during
-                    // showModal() — synthetic, but with isTrusted=true on
-                    // Safari. Block backdrop-close for a beat so the click
-                    // doesn't auto-dismiss the modal that just opened.
-                    dialog._ignoreNextClick = true;
+                    dialog._suppressNextBackdropClick = true;
                     dialog.showModal();
-                    setTimeout(() => { dialog._ignoreNextClick = false; }, 80);
                 }
             } else {
                 if (dialog.open) dialog.close();
