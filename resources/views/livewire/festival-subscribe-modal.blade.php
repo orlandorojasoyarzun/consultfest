@@ -278,9 +278,14 @@
 
         // ESC closes the native <dialog> automatically; sync the Livewire
         // state so the next morph cycle doesn't reopen the dialog.
+        // Dispatch closeSubscribeModal on this component's root element
+        // (closest [wire\\:id]) — that's where Livewire v4's `listen2()`
+        // attaches `$listeners` entries.
         document.addEventListener('close', (e) => {
-            if (e.target && e.target.id === 'festival-subscribe-modal') {
-                Livewire.dispatch('closeSubscribeModal');
+            if (!e.target || e.target.id !== 'festival-subscribe-modal') return;
+            const root = e.target.closest('[wire\\:id]');
+            if (root) {
+                root.dispatchEvent(new CustomEvent('closeSubscribeModal', { bubbles: true }));
             }
         }, true);
     });
