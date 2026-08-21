@@ -19,7 +19,7 @@
         id="unsubscribe-festival-modal"
         class="bg-transparent p-0"
         style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
-        onclick="if(event.target===this && event.isTrusted)livewireFire('unsubscribe-festival-modal','closeUnsubscribeModal')"
+        onclick="if(event.target===this && event.isTrusted && !this._ignoreNextClick)livewireFire('unsubscribe-festival-modal','closeUnsubscribeModal')"
     >
         <style>[open]#unsubscribe-festival-modal{background:transparent;border:0;box-shadow:none;outline:0;padding:0;color-scheme:dark}[open]#unsubscribe-festival-modal::backdrop{background-color:rgba(0,0,0,.6);backdrop-filter:blur(4px)}@keyframes ufm-in{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}[open]#unsubscribe-festival-modal .cinema-card{animation:ufm-in 220ms cubic-bezier(.2,.7,.2,1) both}</style>
         <div
@@ -104,7 +104,15 @@
             const dialog = document.getElementById('unsubscribe-festival-modal');
             if (!dialog) return;
             if (state === true) {
-                if (!dialog.open) dialog.showModal();
+                if (!dialog.open) {
+                    // Some browsers fire a click on the <dialog> during
+                    // showModal() — synthetic, but with isTrusted=true on
+                    // Safari. Block backdrop-close for a beat so the click
+                    // doesn't auto-dismiss the modal that just opened.
+                    dialog._ignoreNextClick = true;
+                    dialog.showModal();
+                    setTimeout(() => { dialog._ignoreNextClick = false; }, 80);
+                }
             } else {
                 if (dialog.open) dialog.close();
             }

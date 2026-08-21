@@ -230,7 +230,7 @@
         id="subscribe-modal"
         class="bg-transparent p-0"
         style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
-        onclick="if(event.target===this && event.isTrusted)livewireFire('festival-results','closeSubscribeModal')"
+        onclick="if(event.target===this && event.isTrusted && !this._ignoreNextClick)livewireFire('festival-results','closeSubscribeModal')"
     >
         <style>[open]#subscribe-modal{background:transparent;border:0;box-shadow:none;outline:0;padding:0;color-scheme:dark}[open]#subscribe-modal::backdrop{background-color:rgba(0,0,0,.6);backdrop-filter:blur(4px)}</style>
         <div
@@ -462,7 +462,15 @@
             const modal = document.getElementById('subscribe-modal');
             if (!modal) return;
             if (state === true) {
-                if (!modal.open) modal.showModal();
+                if (!modal.open) {
+                    // Some browsers fire a click on the <dialog> during
+                    // showModal() — synthetic, but with isTrusted=true on
+                    // Safari. Block backdrop-close for a beat so the click
+                    // doesn't auto-dismiss the modal that just opened.
+                    modal._ignoreNextClick = true;
+                    modal.showModal();
+                    setTimeout(() => { modal._ignoreNextClick = false; }, 80);
+                }
             } else {
                 if (modal.open) modal.close();
             }
