@@ -13,7 +13,7 @@
         id="delete-production-modal"
         class="bg-transparent p-0"
         style="margin: auto; max-width: 32rem; width: calc(100vw - 2rem); max-height: 90vh; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color-scheme: dark; border-radius: 0.75rem; overflow: hidden;"
-        onclick="if(event.target===this)livewireFire('delete-production-modal','closeDeleteModal')"
+        onclick="if(event.target===this && event.isTrusted)livewireFire('delete-production-modal','closeDeleteModal')"
     >
         <style>[open]#delete-production-modal{background:transparent;border:0;box-shadow:none;outline:0;padding:0;color-scheme:dark}[open]#delete-production-modal::backdrop{background-color:rgba(0,0,0,.6);backdrop-filter:blur(4px)}@keyframes dpm-in{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}[open]#delete-production-modal .cinema-card{animation:dpm-in 220ms cubic-bezier(.2,.7,.2,1) both}</style>
         <div
