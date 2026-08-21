@@ -10,9 +10,21 @@ use Symfony\Component\HttpFoundation\Response;
  * Adds defensive response headers to every request.
  *
  * CSP is permissive enough for Vite/Livewire but blocks framing and
- * inline scripts that are not explicitly allowed. In dev, the @vite
- * directive injects inline scripts, so 'unsafe-inline' is allowed for
- * 'script-src' only in non-production environments.
+ * inline scripts that are not explicitly allowed. 'unsafe-inline' for
+ * script-src is allowed in BOTH dev and prod because the app uses
+ * inline `<script>` blocks for things that aren't worth a separate
+ * asset pipeline entry: the theme-detection IIFE in <head>, the
+ * `livewireFire` partial that bridges inline `onclick` handlers to
+ * Livewire v4 sibling components (no `Livewire.dispatch()` global in
+ * v4 — see livewire-sibling-dispatch-pattern memory), and the
+ * `livewire:init` hooks inside each native-<dialog> modal
+ * (`unsubscribeFestivalModal`, `deleteProductionModal`,
+ * `festivalSubscribeModal`). The proper fix is per-script nonces, but
+ * the surface is small and there's no user-controlled content reaching
+ * any of these blocks, so we accept the XSS-risk tradeoff for an MVP.
+ *
+ * `'unsafe-eval'` stays dev-only: Vite's HMR client evaluates dynamic
+ * code; the production bundle is static.
  */
 class SecurityHeaders
 {
@@ -28,7 +40,7 @@ class SecurityHeaders
             "style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com",
             "font-src 'self' https://fonts.bunny.net https://fonts.gstatic.com data:",
             $isProduction
-                ? "script-src 'self'"
+                ? "script-src 'self' 'unsafe-inline'"
                 : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
             "frame-ancestors 'none'",
             "base-uri 'self'",
