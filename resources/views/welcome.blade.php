@@ -66,8 +66,38 @@
     @endif
 
     <main class="max-w-7xl mx-auto px-8 flex-1 w-full">
-        <section class="pt-24 pb-20">
-            <div class="max-w-4xl">
+        <section class="pt-24 pb-20 relative clap-trigger">
+            {{-- Clap decorativo. Renderizado enorme, con opacidad baja
+                 y color accent (dorado del theme) para que sea apenas un
+                 guiño cinematográfico en el fondo. La animación del lucide-
+                 animated (dos <g> anidados con pivotes 4/20 y 3/11) se
+                 reproduce en CSS puro cuando el usuario hace hover sobre
+                 cualquier parte del hero — sacar y volver a pasar el mouse
+                 la reinicia. `aria-hidden` porque es decorativo puro. --}}
+            <div class="absolute bottom-[-12rem] right-0 pointer-events-none overflow-visible cinema-fade-up cinema-stagger-8" style="animation-duration: 900ms;">
+                <svg
+                    class="clap-svg w-[28rem] h-[28rem] md:w-[40rem] md:h-[40rem] text-[var(--accent)] opacity-[0.07]"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    viewBox="0 0 24 24"
+                    style="overflow: visible;"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <g class="clap-outer">
+                        <g class="clap-inner">
+                            <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" />
+                            <path d="m6.2 5.3 3.1 3.9" />
+                            <path d="m12.4 3.4 3.1 4" />
+                        </g>
+                        <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+                    </g>
+                </svg>
+            </div>
+
+            <div class="max-w-4xl relative z-10">
                 <div class="inline-flex items-center gap-2 px-3 py-1 mb-8 cinema-card cinema-fade-up cinema-stagger-1">
                     <div class="w-1.5 h-1.5 bg-[var(--accent)] rounded-full"></div>
                     <span class="text-xs font-medium text-[var(--text-secondary)] tracking-wide">Tracking de festivales para cineastas independientes</span>

@@ -118,7 +118,17 @@
                 @endif
             </section>
 
-            {{-- Suscripciones --}}
+            {{-- Suscripciones. Each row is a small dashboard widget:
+                 the title is a real link to the festival's site (via the
+                 redirect route — same path /festivals/{id} uses), opening
+                 + deadline are read from the cached Festival row, and
+                 unsubscribe is a plain HTML form so it works without JS.
+                 The festival row may legitimately be missing dates (Sitges,
+                 Bilbao Fantasy, etc. publish no schedule at this point), so
+                 the date line degrades to a small "Fechas no publicadas"
+                 note instead of three dead dashes. Notification type is
+                 shown as a quiet chip so the user can see what they'll get
+                 without expanding anything. --}}
             <section class="lg:col-span-5 cinema-card p-7 cinema-fade-up cinema-stagger-2">
                 <div class="flex items-baseline justify-between mb-6">
                     <h2 class="text-sm font-semibold tracking-wide uppercase text-[var(--text-muted)]">Tus festivales</h2>
@@ -131,15 +141,92 @@
                         <a href="{{ route('festivals.index') }}" class="cinema-btn inline-block px-5 py-2 text-sm">Explorar festivales</a>
                     </div>
                 @else
-                    <ul class="space-y-2">
+                    <ul class="space-y-2.5">
                         @foreach($subscriptions as $subscription)
-                            <li class="flex items-center justify-between gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-color)]">
-                                <span class="text-sm truncate">{{ $subscription->festival->name ?? 'Festival eliminado' }}</span>
-                                <span class="text-xs text-[var(--text-faintest)] shrink-0">
-                                    @if($subscription->festival?->deadline)
-                                        {{ \Carbon\Carbon::parse($subscription->festival->deadline)->format('d M Y') }}
-                                    @endif
-                                </span>
+                            @php
+                                $festival = $subscription->festival;
+                                $hasOpening = $festival?->opening_date !== null;
+                                $hasDeadline = $festival?->deadline !== null;
+                                // Carbon 3's diffInDays is signed (negative when the
+                                // compared date is in the future), so wrap with abs()
+                                // before the < 14 check — otherwise 95-day deadlines
+                                // were flagged as "soon" and colored danger red.
+                                $deadlineSoon = $hasDeadline
+                                    && $festival->deadline->isFuture()
+                                    && abs($festival->deadline->diffInDays(now())) < 14;
+                                $deadlinePast = $hasDeadline && $festival->deadline->isPast();
+                                $notificationLabel = match ($subscription->notification_type) {
+                                    'opening' => 'Solo apertura',
+                                    'deadline' => 'Solo deadline',
+                                    default => 'Apertura + deadline',
+                                };
+                            @endphp
+                            <li class="group p-4 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-color)] hover:border-[var(--border-hover)] transition-colors">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0 flex-1">
+                                        @if($festival)
+                                            <a
+                                                href="{{ route('festivals.redirect', ['apiId' => $festival->api_id]) }}"
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors block truncate"
+                                            >
+                                                {{ $festival->name }}
+                                            </a>
+                                        @else
+                                            <span class="text-sm text-[var(--text-faint)] italic block truncate">Festival eliminado</span>
+                                        @endif
+
+                                        {{-- Date line. Both dates are independent:
+                                             the festival may publish one but not the other,
+                                             so we render what we have and skip the rest. --}}
+                                        <div class="flex items-center gap-3 mt-1.5 text-xs text-[var(--text-faint)] flex-wrap">
+                                            @if($hasOpening || $hasDeadline)
+                                                @if($hasOpening)
+                                                    <span class="inline-flex items-center gap-1">
+                                                        <span class="text-[var(--text-faintest)]">Apertura</span>
+                                                        <span class="tabular-nums text-[var(--success)]">{{ $festival->opening_date->format('d M Y') }}</span>
+                                                    </span>
+                                                @endif
+                                                @if($hasOpening && $hasDeadline)
+                                                    <span class="text-[var(--text-faintest)]">·</span>
+                                                @endif
+                                                @if($hasDeadline)
+                                                    <span class="inline-flex items-center gap-1">
+                                                        <span class="text-[var(--text-faintest)]">Deadline</span>
+                                                        <span class="tabular-nums {{ $deadlineSoon ? 'text-[var(--danger)] font-medium' : ($deadlinePast ? 'text-[var(--text-faint)] line-through' : 'text-[var(--text-secondary)] font-medium') }}">
+                                                            {{ $festival->deadline->format('d M Y') }}
+                                                        </span>
+                                                    </span>
+                                                @endif
+                                            @else
+                                                <span class="italic">Fechas no publicadas</span>
+                                            @endif
+                                        </div>
+
+                                        <div class="mt-1 text-[10px] text-[var(--text-faintest)] uppercase tracking-wider">
+                                            {{ $notificationLabel }}
+                                        </div>
+                                    </div>
+
+                                    {{-- Unsubscribe: opens the cinema-styled
+                                         UnsubscribeFestivalModal instead of
+                                         firing a native browser confirm().
+                                         livewireFire() bubbles a CustomEvent
+                                         onto the modal component's own root
+                                         (closest [wire\\:id]), which is where
+                                         Livewire v4 attaches $listeners —
+                                         the global Livewire.dispatch() API
+                                         was removed in v4. --}}
+                                    <button
+                                        type="button"
+                                        onclick="livewireFire('unsubscribe-festival-modal', 'openUnsubscribeModal', { apiId: {{ $festival->api_id }}, name: @js($festival->name) })"
+                                        class="shrink-0 text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                        aria-label="Desuscribirse de {{ $festival->name }}"
+                                    >
+                                        Desuscribirse
+                                    </button>
+                                </div>
                             </li>
                         @endforeach
                     </ul>
@@ -147,6 +234,15 @@
             </section>
         </div>
     </main>
+
+    {{-- Unsubscribe confirmation modal — opened from each row's
+         "Desuscribirse" button via livewireFire(). The modal owns the
+         unsubscribe flow (calls FestivalSubscriptionService directly
+         and redirects back here with a flash), so the row no longer
+         ships its own form. --}}
+    <livewire:unsubscribe-festival-modal />
+
+    @include('partials.livewire-fire')
 
     @livewireScripts
 

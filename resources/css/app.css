@@ -95,9 +95,16 @@ body[data-theme="light"] {
 
     --text-primary: #1a1a1a;
     --text-secondary: #525252;
-    --text-muted: #737373;
-    --text-faint: #a3a3a3;
-    --text-faintest: #d4d4d4;
+    /* --text-muted was #e00d0d (bright red — typo from when the palette
+       was first drafted) which made every muted label render red in
+       light mode. Fixed to match the dark theme's gray hierarchy. */
+    --text-muted: #525252;
+    --text-faint: #737373;
+    /* --text-faintest was #d4d4d4 which had ~1.6:1 contrast against
+       the cream --bg-primary — the email in the header was effectively
+       invisible. Bumped to #737373 (~5:1) so count badges, separators,
+       and the email read clearly without overpowering --text-muted. */
+    --text-faintest: #737373;
 
     --accent: #a68942;
     --accent-hover: #8a6f33;
@@ -174,6 +181,65 @@ body {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Clap icon — lucide-animated replica en CSS puro (sin React/motion).
+   El componente original usa dos motion.g anidados con orígenes de
+   pivote en (4, 20) y (3, 11) del viewBox 0 0 24. Replicamos esos
+   orígenes con `transform-box: view-box` para que 4px signifique
+   "4 unidades del viewBox", no "4px CSS". El outer rota -10°
+   dos veces (start + sustained), el inner hace el movimiento
+   completo 0 → -10° → +16° → 0. Se anima solo cuando el contenedor
+   `.clap-trigger` recibe hover — al sacar el mouse la animación
+   para; al volver a entrar, se reproduce desde cero (comportamiento
+   natural de animation vs hover). */
+@keyframes clap-outer {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-10deg); }
+}
+
+@keyframes clap-inner {
+    0%, 100% { transform: rotate(0deg); }
+    30% { transform: rotate(-10deg); }
+    60% { transform: rotate(16deg); }
+}
+
+.clap-outer {
+    transform-box: view-box;
+    transform-origin: 4px 20px;
+}
+.clap-inner {
+    transform-box: view-box;
+    transform-origin: 3px 11px;
+}
+
+.clap-trigger:hover .clap-outer,
+.clap-trigger:focus-within .clap-outer {
+    animation: clap-outer 800ms ease-in-out;
+}
+.clap-trigger:hover .clap-inner,
+.clap-trigger:focus-within .clap-inner {
+    animation: clap-inner 400ms ease-in-out;
+}
+
+/* Respect users that opted out of motion — collapse the icon to a
+   still clap (matches the lucide static fallback). */
+@media (prefers-reduced-motion: reduce) {
+    .clap-trigger:hover .clap-outer,
+    .clap-trigger:focus-within .clap-outer,
+    .clap-trigger:hover .clap-inner,
+    .clap-trigger:focus-within .clap-inner {
+        animation: none;
+    }
+}
+
+/* Light theme: el dorado del accent (#a68942) sobre el cream del bg
+   queda prácticamente invisible al 7% de opacidad. Hardcodeamos un
+   tono más oscuro SOLO para el clap decorativo — la paleta
+   (--accent) queda sagrada y no se toca, esto es una variante
+   puntual para que el guiño cinematográfico se lea sin gritar. */
+body[data-theme="light"] .clap-svg {
+    color: #5c4a23;
 }
 
 .cinema-fade-up {

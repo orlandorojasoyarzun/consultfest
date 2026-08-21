@@ -139,7 +139,7 @@
                             </a>
                             <button
                                 type="button"
-                                onclick="Livewire.dispatch('openDeleteModal', { id: {{ $production->id }} })"
+                                onclick="livewireFire('delete-production-modal', 'openDeleteModal', { id: {{ $production->id }} })"
                                 class="ml-auto text-xs text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
                             >
                                 Eliminar
@@ -161,8 +161,11 @@
     {{-- Delete-production confirmation modal — global to this page so
          every card's Eliminar button can dispatch into it. State lives
          on the DeleteProductionModal Livewire component; the buttons
-         above just dispatch `openDeleteModal` via vanilla JS. --}}
+         above call `livewireFire()` (defined in the partial below)
+         to bubble the openDeleteModal event onto the modal's root. --}}
     <livewire:delete-production-modal />
+
+    @include('partials.livewire-fire')
 
     @livewireScripts
 </body>

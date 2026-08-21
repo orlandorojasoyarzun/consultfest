@@ -131,7 +131,7 @@
             </a>
             <button
                 type="button"
-                onclick="Livewire.dispatch('openDeleteModal', { id: {{ $production->id }} })"
+                onclick="livewireFire('delete-production-modal', 'openDeleteModal', { id: {{ $production->id }} })"
                 class="ml-auto text-sm text-[var(--danger)] hover:underline transition-colors"
             >
                 Eliminar
@@ -150,6 +150,8 @@
          productions/index.blade.php so the Eliminar button on the
          detail page dispatches into the same dialog. --}}
     <livewire:delete-production-modal />
+
+    @include('partials.livewire-fire')
 
     @livewireScripts
 </body>

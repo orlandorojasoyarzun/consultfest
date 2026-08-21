@@ -168,7 +168,7 @@
                             </a>
                             <button
                                 type="button"
-                                onclick="Livewire.dispatch('openSubscribeModal', { apiId: {{ $festival->apiId }} })"
+                                onclick="livewireFire('festival-subscribe-modal', 'openSubscribeModal', { apiId: {{ $festival->apiId }} })"
                                 class="ml-auto cinema-btn px-4 py-2 text-xs"
                             >
                                 + Suscribirme
@@ -228,6 +228,8 @@
          confirmation flow. festivalNames is populated by the controller
          so the modal title shows up instantly without a round-trip. --}}
     <livewire:festival-subscribe-modal :festival-names="$festivalNames" />
+
+    @include('partials.livewire-fire')
 
     @livewireScripts
 </body>
